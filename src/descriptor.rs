@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use probe_rs::{CoreType, config::Registry};
 use serde::{Deserialize, Serialize};
@@ -6,6 +6,9 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize)]
 pub struct Descriptor {
     chip_name: String,
+    bin_path: Option<PathBuf>,
+    elf_path: Option<PathBuf>,
+    build_command: Option<String>,
 }
 
 impl Descriptor {
@@ -40,5 +43,17 @@ impl Descriptor {
         } else {
             Err(anyhow::anyhow!("No cores found for this chip"))
         }
+    }
+
+    pub fn bin_path(&self) -> &Option<PathBuf> {
+        &self.bin_path
+    }
+
+    pub fn elf_path(&self) -> &Option<PathBuf> {
+        &self.elf_path
+    }
+
+    pub fn build_command(&self) -> &Option<String> {
+        &self.build_command
     }
 }
