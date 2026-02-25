@@ -1,0 +1,15 @@
+[package]
+name = "ter-cli"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0.102"
+clap = { version = "4.5.60", features = ["derive"] }
+defmt-decoder = "1.1.0"
+directories = "6.0.0"
+env_logger = "0.11.9"
+log = "0.4.29"
+probe-rs = "0.31.0"
+serde = { version = "1.0.228", features = ["derive"] }
+toml = "1.0.3"
