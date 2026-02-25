@@ -37,6 +37,9 @@ enum Commands {
         #[arg(long)]
         /// Attach defmt rtt to the bootloader's messages
         bootloader_defmt: bool,
+        #[arg(long)]
+        /// Bootloader path. For testing purposes
+        bootloader_path: Option<PathBuf>,
     },
     /// Clear all bootloader cache
     Clear,
@@ -53,9 +56,10 @@ fn main() -> anyhow::Result<()> {
             bin_path,
             defmt,
             bootloader_defmt,
+            bootloader_path,
         } => {
             let (bootloader_bin_path, bootloader_elf_path) =
-                get_bootloader_path(&descriptor, bootloader_defmt)?;
+                get_bootloader_path(bootloader_path, &descriptor, bootloader_defmt)?;
             flash::flash(
                 bootloader_bin_path,
                 bin_path.unwrap(),
@@ -63,6 +67,7 @@ fn main() -> anyhow::Result<()> {
             )?;
 
             if bootloader_defmt {
+                println!("{:?}", &bootloader_elf_path);
                 defmt::attach_defmt(&descriptor, bootloader_elf_path)?;
             } else if let Some(elf_path) = defmt {
                 defmt::attach_defmt(&descriptor, elf_path)?;

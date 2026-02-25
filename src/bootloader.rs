@@ -4,19 +4,22 @@ use std::{
 };
 
 use crate::{DIRS, descriptor::Descriptor};
-// CHANGE
+
 pub fn get_bootloader_path(
+    bootloader_path: Option<PathBuf>,
     descriptor: &Descriptor,
     defmt: bool,
 ) -> anyhow::Result<(PathBuf, PathBuf)> {
-    // END CHANGE
     let _ = std::fs::create_dir_all(DIRS.data_dir());
 
     let mut dir_name = descriptor.chip_hal_name();
     if defmt {
         dir_name.push_str("-defmt");
     }
-    let target_dir = DIRS.data_dir().join(&dir_name);
+    let mut target_dir = DIRS.data_dir().join(&dir_name);
+    if let Some(path) = bootloader_path {
+        target_dir = path;
+    }
 
     if !target_dir.is_dir() {
         log::info!("Bootloader for current chip not found. Building new bootloader");
@@ -27,7 +30,6 @@ pub fn get_bootloader_path(
         log::info!("Bootloader built");
     }
 
-    // CHANGE
     if !target_dir.join("boot.bin").exists() || !target_dir.join("boot.elf").exists() {
         let _ = std::fs::remove_dir_all(&target_dir);
         log::info!("Bootloader for current chip was corrupt. Building new bootloader");
@@ -40,7 +42,6 @@ pub fn get_bootloader_path(
 
     Ok((target_dir.join("boot.bin"), target_dir.join("boot.elf")))
 }
-// END CHANGE
 
 fn generate_new_bootloader(descriptor: &Descriptor, defmt: bool) -> anyhow::Result<()> {
     let mut dir_name = descriptor.chip_hal_name();
@@ -85,7 +86,6 @@ fn generate_new_bootloader(descriptor: &Descriptor, defmt: bool) -> anyhow::Resu
         .stderr(Stdio::inherit())
         .status()?;
 
-    // CHANGE
     if !status.success() {
         anyhow::bail!("Cargo objcopy failed with status: {}", status);
     }
@@ -96,9 +96,7 @@ fn generate_new_bootloader(descriptor: &Descriptor, defmt: bool) -> anyhow::Resu
         .join(&chip_arch)
         .join("release")
         .join("boot");
-
     let elf_dest = bootloader_dir.join("boot.elf");
-
     if let Err(e) = std::fs::copy(&elf_src, &elf_dest) {
         anyhow::bail!(
             "Failed to copy ELF file from {} to {}: {}",
@@ -109,7 +107,6 @@ fn generate_new_bootloader(descriptor: &Descriptor, defmt: bool) -> anyhow::Resu
     }
 
     let status = Command::new("cargo")
-        // END CHANGE
         .arg("clean")
         .current_dir(&bootloader_dir)
         .stdout(Stdio::inherit())
