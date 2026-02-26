@@ -133,9 +133,19 @@ fn flash_command(
         get_bootloader_path(bootloader_path, &descriptor, bootloader_defmt)?;
 
     if let Some(bin_path) = bin_path {
-        flash::flash(bootloader_bin_path, bin_path, descriptor.chip_name())?;
+        flash::flash(
+            bootloader_bin_path,
+            bin_path,
+            descriptor.chip_name(),
+            bootloader_defmt,
+        )?;
     } else if let Some(bin_path) = descriptor.bin_path() {
-        flash::flash(bootloader_bin_path, bin_path, descriptor.chip_name())?;
+        flash::flash(
+            bootloader_bin_path,
+            bin_path,
+            descriptor.chip_name(),
+            bootloader_defmt,
+        )?;
     } else {
         log::warn!(
             "No bin path was supplied. You must either pass it with the --bin-path arg or as bin_path in ter.toml"

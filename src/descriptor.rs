@@ -1,14 +1,23 @@
-use std::path::{Path, PathBuf};
+use std::{
+    hash::{DefaultHasher, Hash, Hasher},
+    path::{Path, PathBuf},
+};
 
+use heck::ToKebabCase;
 use probe_rs::{CoreType, config::Registry};
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Descriptor {
+    project_name: String,
     chip_name: String,
     bin_path: Option<PathBuf>,
     elf_path: Option<PathBuf>,
     build_command: Option<String>,
+    hse: Option<String>,
+    can: Option<String>,
+    can_tx: Option<String>,
+    can_rx: Option<String>,
 }
 
 impl Descriptor {
@@ -55,5 +64,70 @@ impl Descriptor {
 
     pub fn build_command(&self) -> &Option<String> {
         &self.build_command
+    }
+
+    pub fn get_generate_args(&self) -> impl Iterator<Item = String> {
+        let slash_d = String::from("-d");
+        let mut chip_hasher = DefaultHasher::new();
+        self.project_name.hash(&mut chip_hasher);
+        let project_hash: u64 = chip_hasher.finish();
+
+        [
+            slash_d.clone(),
+            format!("board-hash={}", project_hash),
+            slash_d.clone(),
+            format!("hse-freq={}", self.hse.clone().unwrap_or(String::from("0"))),
+            slash_d.clone(),
+            format!("can={}", self.can.clone().unwrap_or(String::from("NONE"))),
+            slash_d.clone(),
+            format!(
+                "can-tx={}",
+                self.can_tx.clone().unwrap_or(String::from("NONE"))
+            ),
+            slash_d.clone(),
+            format!(
+                "can-rx={}",
+                self.can_rx.clone().unwrap_or(String::from("NONE"))
+            ),
+        ]
+        .into_iter()
+    }
+
+    pub fn get_objcopy_args(&self) -> impl Iterator<Item = &str> {
+        let mut args = Vec::new();
+
+        if self.hse.is_some() {
+            args.push("-F");
+            args.push("hse");
+        }
+
+        args.into_iter()
+    }
+
+    pub fn get_identity_json(&self) -> anyhow::Result<String> {
+        Ok(serde_jcs::to_string(&DescriptorJson::from(self.clone()))?.to_kebab_case())
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct DescriptorJson {
+    project_name: String,
+    chip_name: String,
+    hse: Option<String>,
+    can: Option<String>,
+    can_tx: Option<String>,
+    can_rx: Option<String>,
+}
+
+impl From<Descriptor> for DescriptorJson {
+    fn from(d: Descriptor) -> Self {
+        Self {
+            project_name: d.project_name,
+            chip_name: d.chip_name,
+            hse: d.hse,
+            can: d.can,
+            can_tx: d.can_tx,
+            can_rx: d.can_rx,
+        }
     }
 }

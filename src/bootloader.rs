@@ -16,6 +16,8 @@ pub fn get_bootloader_path(
     if defmt {
         dir_name.push_str("-defmt");
     }
+    dir_name.push_str("-");
+    dir_name.push_str(&descriptor.get_identity_json()?);
     let mut target_dir = DIRS.data_dir().join(&dir_name);
     if let Some(path) = bootloader_path {
         target_dir = path;
@@ -48,20 +50,29 @@ fn generate_new_bootloader(descriptor: &Descriptor, defmt: bool) -> anyhow::Resu
     if defmt {
         dir_name.push_str("-defmt");
     }
+    dir_name.push_str("-");
+    dir_name.push_str(&descriptor.get_identity_json()?);
 
-    let status = Command::new("cargo")
-        .args([
-            "generate",
-            "gh:Asempere123123/stm32-bootloader",
-            "--name",
-            &dir_name,
-            "-d",
-            &format!("chip-name={}", descriptor.chip_name()),
-            "-d",
-            &format!("chip-hal-name={}", descriptor.chip_hal_name()),
-            "-d",
-            &format!("chip-arch={}", descriptor.chip_arch_name()?),
-        ])
+    let mut cargo_generate_cmd = Command::new("cargo");
+    cargo_generate_cmd.args([
+        "generate",
+        "gh:Asempere123123/stm32-bootloader",
+        "--name",
+        &dir_name,
+        "-d",
+        &format!("chip-name={}", descriptor.chip_name()),
+        "-d",
+        &format!("chip-hal-name={}", descriptor.chip_hal_name()),
+        "-d",
+        &format!("chip-arch={}", descriptor.chip_arch_name()?),
+    ]);
+    if defmt {
+        cargo_generate_cmd.args(["-d", "flash-size=40"]);
+    } else {
+        cargo_generate_cmd.args(["-d", "flash-size=16"]);
+    }
+    cargo_generate_cmd.args(descriptor.get_generate_args());
+    let status = cargo_generate_cmd
         .current_dir(DIRS.data_dir())
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
@@ -78,6 +89,7 @@ fn generate_new_bootloader(descriptor: &Descriptor, defmt: bool) -> anyhow::Resu
         objcopy_args.push("-F");
         objcopy_args.push("defmt");
     }
+    objcopy_args.extend(descriptor.get_objcopy_args());
     objcopy_args.extend(["--", "-O", "binary", "boot.bin"]);
     let status = Command::new("cargo")
         .args(&objcopy_args)

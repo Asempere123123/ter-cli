@@ -9,7 +9,9 @@ clap = { version = "4.5.60", features = ["derive"] }
 defmt-decoder = "1.1.0"
 directories = "6.0.0"
 env_logger = "0.11.9"
+heck = "0.5.0"
 log = "0.4.29"
 probe-rs = "0.31.0"
 serde = { version = "1.0.228", features = ["derive"] }
+serde_jcs = "0.1.0"
 toml = "1.0.3"
