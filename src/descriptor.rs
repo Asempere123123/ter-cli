@@ -105,29 +105,27 @@ impl Descriptor {
     }
 
     pub fn get_identity_json(&self) -> anyhow::Result<String> {
-        Ok(serde_jcs::to_string(&DescriptorJson::from(self.clone()))?.to_kebab_case())
+        Ok(serde_jcs::to_string(&DescriptorJson::from(self))?.to_kebab_case())
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct DescriptorJson {
-    project_name: String,
-    chip_name: String,
-    hse: Option<String>,
-    can: Option<String>,
-    can_tx: Option<String>,
-    can_rx: Option<String>,
+#[derive(Serialize, Debug)]
+pub struct DescriptorJson<'a> {
+    project_name: &'a String,
+    hse: &'a Option<String>,
+    can: &'a Option<String>,
+    can_tx: &'a Option<String>,
+    can_rx: &'a Option<String>,
 }
 
-impl From<Descriptor> for DescriptorJson {
-    fn from(d: Descriptor) -> Self {
+impl<'a> From<&'a Descriptor> for DescriptorJson<'a> {
+    fn from(d: &'a Descriptor) -> Self {
         Self {
-            project_name: d.project_name,
-            chip_name: d.chip_name,
-            hse: d.hse,
-            can: d.can,
-            can_tx: d.can_tx,
-            can_rx: d.can_rx,
+            project_name: &d.project_name,
+            hse: &d.hse,
+            can: &d.can,
+            can_tx: &d.can_tx,
+            can_rx: &d.can_rx,
         }
     }
 }
