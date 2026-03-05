@@ -84,15 +84,22 @@ fn generate_new_bootloader(descriptor: &Descriptor, defmt: bool) -> anyhow::Resu
 
     let bootloader_dir = DIRS.data_dir().join(&dir_name);
 
-    let mut objcopy_args = vec!["objcopy", "--release"];
+    // Cargo objcopy
+    let mut objcopy_command = Command::new("cargo");
+    objcopy_command.args(["objcopy", "--release"]);
+
+    let mut objcopy_features = Vec::new();
     if defmt {
-        objcopy_args.push("-F");
-        objcopy_args.push("defmt");
+        objcopy_features.push("defmt");
     }
-    objcopy_args.extend(descriptor.get_objcopy_args());
-    objcopy_args.extend(["--", "-O", "binary", "boot.bin"]);
-    let status = Command::new("cargo")
-        .args(&objcopy_args)
+    objcopy_features.extend(descriptor.get_objcopy_features());
+    if !objcopy_features.is_empty() {
+        objcopy_command.arg("-F");
+        objcopy_command.arg(objcopy_features.join(","));
+    }
+
+    objcopy_command.args(["--", "-O", "binary", "boot.bin"]);
+    let status = objcopy_command
         .current_dir(&bootloader_dir)
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())

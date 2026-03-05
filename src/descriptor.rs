@@ -93,11 +93,10 @@ impl Descriptor {
         .into_iter()
     }
 
-    pub fn get_objcopy_args(&self) -> impl Iterator<Item = &str> {
+    pub fn get_objcopy_features(&self) -> impl Iterator<Item = &str> {
         let mut args = Vec::new();
 
         if self.hse.is_some() {
-            args.push("-F");
             args.push("hse");
         }
 
