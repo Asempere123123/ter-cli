@@ -1,6 +1,9 @@
 use std::path::Path;
 
-use probe_rs::{Session, SessionConfig};
+use probe_rs::{
+    Error, Permissions, Session,
+    probe::{DebugProbeError, ProbeCreationError, list::Lister},
+};
 
 const BOOTLOADER_SIZE: u64 = 16 * 1024;
 
@@ -9,13 +12,20 @@ pub fn flash(
     app_path: impl AsRef<Path>,
     chip_name: &str,
     bootloader_defmt: bool,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<Session> {
     log::info!("Flashing App");
     let bootloader = std::fs::read(bootloader_path)?;
     let app = std::fs::read(app_path)?;
 
-    let session_config = SessionConfig::default();
-    let mut session = Session::auto_attach(chip_name, session_config)?;
+    let lister = Lister::new();
+    let probes = lister.list_all();
+    let probe = probes
+        .first()
+        .ok_or(Error::Probe(DebugProbeError::ProbeCouldNotBeCreated(
+            ProbeCreationError::NotFound,
+        )))?
+        .open()?;
+    let mut session = probe.attach_under_reset(chip_name, Permissions::default())?;
 
     let mut loader = session.target().flash_loader();
 
@@ -28,5 +38,7 @@ pub fn flash(
     log::info!("Flashing Complete. Reseting app");
     let mut core = session.core(0)?;
     core.reset()?;
-    Ok(())
+    drop(core);
+
+    Ok(session)
 }

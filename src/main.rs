@@ -12,6 +12,7 @@ use std::{
 use anyhow::bail;
 use clap::{Parser, Subcommand};
 use directories::ProjectDirs;
+use probe_rs::Session;
 
 use crate::{bootloader::get_bootloader_path, descriptor::Descriptor};
 
@@ -132,15 +133,16 @@ fn flash_command(
     let (bootloader_bin_path, bootloader_elf_path) =
         get_bootloader_path(bootloader_path, &descriptor, bootloader_defmt)?;
 
+    let session: Session;
     if let Some(bin_path) = bin_path {
-        flash::flash(
+        session = flash::flash(
             bootloader_bin_path,
             bin_path,
             descriptor.chip_name(),
             bootloader_defmt,
         )?;
     } else if let Some(bin_path) = descriptor.bin_path() {
-        flash::flash(
+        session = flash::flash(
             bootloader_bin_path,
             bin_path,
             descriptor.chip_name(),
@@ -149,15 +151,16 @@ fn flash_command(
     } else {
         log::warn!(
             "No bin path was supplied. You must either pass it with the --bin-path arg or as bin_path in ter.toml"
-        )
+        );
+        return Ok(());
     }
 
     if bootloader_defmt {
-        defmt::attach_defmt(&descriptor, bootloader_elf_path)?;
+        defmt::attach_defmt(session, bootloader_elf_path)?;
     } else if let Some(elf_path) = defmt {
-        defmt::attach_defmt(&descriptor, elf_path)?;
+        defmt::attach_defmt(session, elf_path)?;
     } else if let Some(elf_path) = descriptor.elf_path() {
-        defmt::attach_defmt(&descriptor, elf_path.to_path_buf())?;
+        defmt::attach_defmt(session, elf_path.to_path_buf())?;
     }
 
     Ok(())

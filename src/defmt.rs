@@ -2,16 +2,12 @@ use std::path::PathBuf;
 
 use anyhow::anyhow;
 use probe_rs::{
-    Session, SessionConfig,
+    Session,
     rtt::{Rtt, UpChannel},
 };
 
-use crate::descriptor::Descriptor;
-
-pub fn attach_defmt(descriptor: &Descriptor, elf_path: PathBuf) -> anyhow::Result<()> {
+pub fn attach_defmt(mut session: Session, elf_path: PathBuf) -> anyhow::Result<()> {
     log::info!("Attaching defmt logging");
-    let session_config = SessionConfig::default();
-    let mut session = Session::auto_attach(descriptor.chip_name(), session_config)?;
     let mut core = session.core(0)?;
 
     let mut rtt = Rtt::attach(&mut core)?;
