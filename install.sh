@@ -4,24 +4,30 @@ URL="https://github.com/Asempere123123/ter-cli/releases/download/v0.0.1/ter-cli"
 FILENAME="ter-cli"
 TARGET_DIR="/usr/local/bin"
 
-if [ "$EUID" -ne 0 ]; then
-    echo "Elevated privileges required. Asking for sudo..."
-    exec sudo bash "$0" "$@"
-    exit $?
-fi
-
 if command -v curl >/dev/null 2>&1; then
     echo "Downloading with curl..."
-    curl -L "$URL" -o "/tmp/$FILENAME"
+    curl -fsSL "$URL" -o "/tmp/$FILENAME"
 elif command -v wget >/dev/null 2>&1; then
     echo "Downloading with wget..."
-    wget -O "/tmp/$FILENAME" "$URL"
+    wget -qO "/tmp/$FILENAME" "$URL"
 else
     echo "Error: Neither curl nor wget found. Please install one."
     exit 1
 fi
 
-mv "/tmp/$FILENAME" "$TARGET_DIR/$FILENAME"
-chmod +x "$TARGET_DIR/$FILENAME"
+echo "Installing $FILENAME to $TARGET_DIR..."
+echo "Elevated privileges may be required..."
 
-echo "Success!"
+sudo mkdir -p "$TARGET_DIR"
+
+sudo mv "/tmp/$FILENAME" "$TARGET_DIR/$FILENAME"
+sudo chmod +x "$TARGET_DIR/$FILENAME"
+
+if [ -f "$TARGET_DIR/$FILENAME" ]; then
+    echo "---------------------------------------"
+    echo "Success! $FILENAME is now installed."
+    echo "Try running it by typing: $FILENAME"
+else
+    echo "Installation failed."
+    exit 1
+fi
