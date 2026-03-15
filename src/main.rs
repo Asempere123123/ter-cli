@@ -161,6 +161,8 @@ fn flash_command(
         defmt::attach_defmt(session, elf_path)?;
     } else if let Some(elf_path) = descriptor.elf_path() {
         defmt::attach_defmt(session, elf_path.to_path_buf())?;
+    } else if descriptor.uses_string_rtt().unwrap_or(false) {
+        defmt::attach_string_rtt(session)?;
     }
 
     Ok(())

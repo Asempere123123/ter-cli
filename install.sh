@@ -1,7 +1,7 @@
 #!/bin/bash
 
-URL="https://github.com/Asempere123123/ter-cli/releases/download/v0.0.1/ter-cli"
-FILENAME="ter-cli"
+URL="https://github.com/Asempere123123/ter-cli/releases/download/v0.0.2/ter-cli"
+FILENAME="ter"
 TARGET_DIR="/usr/local/bin"
 
 if command -v curl >/dev/null 2>&1; then

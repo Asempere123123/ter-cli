@@ -18,6 +18,7 @@ pub struct Descriptor {
     can: Option<String>,
     can_tx: Option<String>,
     can_rx: Option<String>,
+    string_rtt: Option<bool>,
 }
 
 impl Descriptor {
@@ -64,6 +65,10 @@ impl Descriptor {
 
     pub fn build_command(&self) -> &Option<String> {
         &self.build_command
+    }
+
+    pub fn uses_string_rtt(&self) -> Option<bool> {
+        self.string_rtt
     }
 
     pub fn get_generate_args(&self) -> impl Iterator<Item = String> {

@@ -1,10 +1,9 @@
-use std::path::PathBuf;
-
 use anyhow::anyhow;
 use probe_rs::{
     Session,
     rtt::{Rtt, UpChannel},
 };
+use std::{io::Write, path::PathBuf};
 
 pub fn attach_defmt(mut session: Session, elf_path: PathBuf) -> anyhow::Result<()> {
     log::info!("Attaching defmt logging");
@@ -30,6 +29,27 @@ pub fn attach_defmt(mut session: Session, elf_path: PathBuf) -> anyhow::Result<(
             while let Ok(frame) = decoder.decode() {
                 println!("{}", frame.display(true));
             }
+        }
+    }
+}
+
+pub fn attach_string_rtt(mut session: Session) -> anyhow::Result<()> {
+    log::info!("Attaching RTT logging");
+    let mut core = session.core(0)?;
+
+    let mut rtt = Rtt::attach(&mut core)?;
+    let up_channel: &mut UpChannel = rtt
+        .up_channels()
+        .first_mut()
+        .ok_or_else(|| anyhow!("No RTT up channel found"))?;
+
+    let mut buffer = [0u8; 1024 * 4];
+    loop {
+        let read = up_channel.read(&mut core, &mut buffer)?;
+        if read > 0 {
+            let message = String::from_utf8_lossy(&buffer[..read]);
+            print!("{}", message);
+            std::io::stdout().flush()?;
         }
     }
 }
