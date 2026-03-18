@@ -14,7 +14,7 @@ use clap::{Parser, Subcommand};
 use directories::ProjectDirs;
 use probe_rs::Session;
 
-use crate::{bootloader::get_bootloader_path, descriptor::Descriptor};
+use crate::{bootloader::get_bootloader_path, descriptor::Descriptor, flash::get_session};
 
 static DIRS: LazyLock<ProjectDirs> =
     LazyLock::new(|| ProjectDirs::from("com", "ter", "ter-cli").unwrap());
@@ -52,6 +52,18 @@ enum Commands {
         #[arg(long)]
         /// Path to the .bin
         bin_path: Option<PathBuf>,
+        #[arg(long)]
+        /// Attach defmt rtt given an elf file
+        defmt: Option<PathBuf>,
+        #[arg(long)]
+        /// Attach defmt rtt to the bootloader's messages
+        bootloader_defmt: bool,
+        #[arg(long)]
+        /// Bootloader path. For testing purposes
+        bootloader_path: Option<PathBuf>,
+    },
+    /// Attach without doing anything else
+    Attach {
         #[arg(long)]
         /// Attach defmt rtt given an elf file
         defmt: Option<PathBuf>,
@@ -114,6 +126,23 @@ fn main() -> anyhow::Result<()> {
             bootloader_path,
             &descriptor,
         )?,
+        Commands::Attach {
+            defmt,
+            bootloader_defmt,
+            bootloader_path,
+        } => {
+            let (_bootloader_bin_path, bootloader_elf_path) =
+                get_bootloader_path(bootloader_path, &descriptor, bootloader_defmt)?;
+
+            let session = get_session(descriptor.chip_name())?;
+            attach_command(
+                bootloader_defmt,
+                session,
+                bootloader_elf_path,
+                defmt,
+                &descriptor,
+            )?;
+        }
         Commands::Clear => {
             log::info!("Cleaning up bootloader cache");
             std::fs::remove_dir_all(DIRS.data_dir())?
@@ -155,6 +184,24 @@ fn flash_command(
         return Ok(());
     }
 
+    attach_command(
+        bootloader_defmt,
+        session,
+        bootloader_elf_path,
+        defmt,
+        descriptor,
+    )?;
+
+    Ok(())
+}
+
+fn attach_command(
+    bootloader_defmt: bool,
+    session: Session,
+    bootloader_elf_path: PathBuf,
+    defmt: Option<PathBuf>,
+    descriptor: &Descriptor,
+) -> anyhow::Result<()> {
     if bootloader_defmt {
         defmt::attach_defmt(session, bootloader_elf_path)?;
     } else if let Some(elf_path) = defmt {
@@ -164,6 +211,5 @@ fn flash_command(
     } else if descriptor.uses_string_rtt().unwrap_or(false) {
         defmt::attach_string_rtt(session)?;
     }
-
     Ok(())
 }
