@@ -18,6 +18,7 @@ pub struct Descriptor {
     can: Option<String>,
     can_tx: Option<String>,
     can_rx: Option<String>,
+    can_baudrate: Option<String>,
     string_rtt: Option<bool>,
 }
 
@@ -94,6 +95,11 @@ impl Descriptor {
                 "can-rx={}",
                 self.can_rx.clone().unwrap_or(String::from("NONE"))
             ),
+            slash_d.clone(),
+            format!(
+                "can-baudrate={}",
+                self.can_baudrate.clone().unwrap_or(String::from("NONE"))
+            ),
         ]
         .into_iter()
     }
@@ -103,6 +109,9 @@ impl Descriptor {
 
         if self.hse.is_some() {
             args.push("hse");
+        }
+        if self.can.is_some() {
+            args.push("can");
         }
 
         args.into_iter()
@@ -120,6 +129,7 @@ pub struct DescriptorJson<'a> {
     can: &'a Option<String>,
     can_tx: &'a Option<String>,
     can_rx: &'a Option<String>,
+    can_baudrate: &'a Option<String>,
 }
 
 impl<'a> From<&'a Descriptor> for DescriptorJson<'a> {
@@ -130,6 +140,7 @@ impl<'a> From<&'a Descriptor> for DescriptorJson<'a> {
             can: &d.can,
             can_tx: &d.can_tx,
             can_rx: &d.can_rx,
+            can_baudrate: &d.can_baudrate,
         }
     }
 }
