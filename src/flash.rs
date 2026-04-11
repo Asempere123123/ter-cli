@@ -21,7 +21,7 @@ pub fn flash(
     descriptor: &Descriptor,
 ) -> anyhow::Result<Session> {
     log::info!(
-        "FLASH_SIZE = {}",
+        "FLASH_ERASE_SIZE = {}",
         flash_size::get_first_sector_size(&descriptor)?
     );
     log::info!("Flashing App");

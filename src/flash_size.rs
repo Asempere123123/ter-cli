@@ -2,6 +2,8 @@ use crate::descriptor::Descriptor;
 use cached::proc_macro::cached;
 use serde_json::Value;
 
+const MIN_BOOTLOADER_SIZE: u64 = 16 * 1024;
+
 #[cached(
     key = "String",
     convert = r#"{ desc.chip_name().to_owned() }"#,
@@ -29,5 +31,6 @@ pub fn get_first_sector_size(desc: &Descriptor) -> anyhow::Result<u64> {
 
     first_flash["settings"]["erase_size"]
         .as_u64()
+        .map(|flash_size| flash_size.max(MIN_BOOTLOADER_SIZE))
         .ok_or(anyhow::anyhow!("First sector size not found"))
 }
