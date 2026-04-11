@@ -2,6 +2,7 @@ mod bootloader;
 mod defmt;
 mod descriptor;
 mod flash;
+mod flash_size;
 
 use std::{
     path::PathBuf,

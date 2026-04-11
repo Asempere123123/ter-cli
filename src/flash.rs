@@ -10,9 +10,7 @@ use socketcan::{
     CanDataFrame, CanFrame, CanInterface, EmbeddedFrame, Id, StandardId, smol::CanSocket,
 };
 
-use crate::descriptor::Descriptor;
-
-const BOOTLOADER_SIZE: u64 = 16 * 1024;
+use crate::{descriptor::Descriptor, flash_size};
 
 pub fn flash(
     bootloader_path: impl AsRef<Path>,
@@ -22,6 +20,10 @@ pub fn flash(
     can: bool,
     descriptor: &Descriptor,
 ) -> anyhow::Result<Session> {
+    log::info!(
+        "FLASH_SIZE = {}",
+        flash_size::get_first_sector_size(&descriptor)?
+    );
     log::info!("Flashing App");
     let bootloader = std::fs::read(bootloader_path)?;
     let app = std::fs::read(app_path)?;
@@ -37,7 +39,10 @@ pub fn flash(
 
     loader.add_data(0x08000000, &bootloader)?;
     if !bootloader_defmt {
-        loader.add_data(0x08000000 + BOOTLOADER_SIZE, &app)?;
+        loader.add_data(
+            0x08000000 + flash_size::get_first_sector_size(&descriptor)?,
+            &app,
+        )?;
     }
     loader.commit(&mut session, Default::default())?;
 

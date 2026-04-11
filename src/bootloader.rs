@@ -3,7 +3,7 @@ use std::{
     process::{Command, Stdio},
 };
 
-use crate::{DIRS, descriptor::Descriptor};
+use crate::{DIRS, descriptor::Descriptor, flash_size};
 
 pub fn get_bootloader_path(
     bootloader_path: Option<PathBuf>,
@@ -69,7 +69,10 @@ fn generate_new_bootloader(descriptor: &Descriptor, defmt: bool) -> anyhow::Resu
     if defmt {
         cargo_generate_cmd.args(["-d", "flash-size=40"]);
     } else {
-        cargo_generate_cmd.args(["-d", "flash-size=16"]);
+        cargo_generate_cmd.arg("-d").arg(format!(
+            "flash-size={}",
+            flash_size::get_first_sector_size(descriptor)? / 1024
+        ));
     }
     cargo_generate_cmd.args(descriptor.get_generate_args());
     let status = cargo_generate_cmd

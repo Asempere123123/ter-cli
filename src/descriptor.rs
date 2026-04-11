@@ -47,10 +47,7 @@ impl Descriptor {
             && desc.can2_tx.is_some()
             && desc.can2_rx.is_some()
             && desc.can_baudrate.is_some())
-            || (desc.can2.is_none()
-                && desc.can2_tx.is_none()
-                && desc.can2_rx.is_none()
-                && desc.can_baudrate.is_none()))
+            || (desc.can2.is_none() && desc.can2_tx.is_none() && desc.can2_rx.is_none()))
         {
             anyhow::bail!(
                 r#"Either all "can2", "can2_tx", "can2_rx", "can_baudrate" must be defined or none in ter.toml"#
