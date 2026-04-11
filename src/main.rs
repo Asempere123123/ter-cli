@@ -46,6 +46,9 @@ enum Commands {
         #[arg(long)]
         /// Bootloader path. For testing purposes
         bootloader_path: Option<PathBuf>,
+        #[arg(short, long)]
+        /// Flash via can. Requires having flashed the bootloader via ter run/flash before
+        can: bool,
     },
     /// Flash binary
     Flash {
@@ -61,6 +64,9 @@ enum Commands {
         #[arg(long)]
         /// Bootloader path. For testing purposes
         bootloader_path: Option<PathBuf>,
+        #[arg(short, long)]
+        /// Flash via can. Requires having flashed the bootloader via ter run/flash before
+        can: bool,
     },
     /// Attach without doing anything else
     Attach {
@@ -90,6 +96,7 @@ fn main() -> anyhow::Result<()> {
             defmt,
             bootloader_defmt,
             bootloader_path,
+            can,
         } => {
             if let Some(build_cmd) = descriptor.build_command() {
                 let status = Command::new("sh")
@@ -112,6 +119,7 @@ fn main() -> anyhow::Result<()> {
                 bootloader_defmt,
                 bootloader_path,
                 &descriptor,
+                can,
             )?;
         }
         Commands::Flash {
@@ -119,12 +127,14 @@ fn main() -> anyhow::Result<()> {
             defmt,
             bootloader_defmt,
             bootloader_path,
+            can,
         } => flash_command(
             bin_path,
             defmt,
             bootloader_defmt,
             bootloader_path,
             &descriptor,
+            can,
         )?,
         Commands::Attach {
             defmt,
@@ -158,6 +168,7 @@ fn flash_command(
     bootloader_defmt: bool,
     bootloader_path: Option<PathBuf>,
     descriptor: &Descriptor,
+    can: bool,
 ) -> anyhow::Result<()> {
     let (bootloader_bin_path, bootloader_elf_path) =
         get_bootloader_path(bootloader_path, &descriptor, bootloader_defmt)?;
@@ -169,6 +180,8 @@ fn flash_command(
             bin_path,
             descriptor.chip_name(),
             bootloader_defmt,
+            can,
+            descriptor,
         )?;
     } else if let Some(bin_path) = descriptor.bin_path() {
         session = flash::flash(
@@ -176,6 +189,8 @@ fn flash_command(
             bin_path,
             descriptor.chip_name(),
             bootloader_defmt,
+            can,
+            descriptor,
         )?;
     } else {
         log::warn!(

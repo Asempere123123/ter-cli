@@ -18,13 +18,46 @@ pub struct Descriptor {
     can: Option<String>,
     can_tx: Option<String>,
     can_rx: Option<String>,
+    can2: Option<String>,
+    can2_tx: Option<String>,
+    can2_rx: Option<String>,
     can_baudrate: Option<String>,
     string_rtt: Option<bool>,
 }
 
 impl Descriptor {
     pub fn from_path(path: impl AsRef<Path>) -> anyhow::Result<Self> {
-        Ok(toml::from_str(&std::fs::read_to_string(path)?)?)
+        let desc: Descriptor = toml::from_str(&std::fs::read_to_string(path)?)?;
+
+        if !((desc.can.is_some()
+            && desc.can_tx.is_some()
+            && desc.can_rx.is_some()
+            && desc.can_baudrate.is_some())
+            || (desc.can.is_none()
+                && desc.can_tx.is_none()
+                && desc.can_rx.is_none()
+                && desc.can_baudrate.is_none()))
+        {
+            anyhow::bail!(
+                r#"Either all "can", "can_tx", "can_rx", "can_baudrate" must be defined or none in ter.toml"#
+            );
+        }
+
+        if !((desc.can2.is_some()
+            && desc.can2_tx.is_some()
+            && desc.can2_rx.is_some()
+            && desc.can_baudrate.is_some())
+            || (desc.can2.is_none()
+                && desc.can2_tx.is_none()
+                && desc.can2_rx.is_none()
+                && desc.can_baudrate.is_none()))
+        {
+            anyhow::bail!(
+                r#"Either all "can2", "can2_tx", "can2_rx", "can_baudrate" must be defined or none in ter.toml"#
+            );
+        }
+
+        Ok(desc)
     }
 
     pub fn chip_name(&self) -> &str {
@@ -72,11 +105,16 @@ impl Descriptor {
         self.string_rtt
     }
 
-    pub fn get_generate_args(&self) -> impl Iterator<Item = String> {
-        let slash_d = String::from("-d");
+    pub fn name_hash(&self) -> u64 {
         let mut chip_hasher = DefaultHasher::new();
         self.project_name.hash(&mut chip_hasher);
         let project_hash: u64 = chip_hasher.finish();
+        project_hash
+    }
+
+    pub fn get_generate_args(&self) -> impl Iterator<Item = String> {
+        let slash_d = String::from("-d");
+        let project_hash = self.name_hash();
 
         [
             slash_d.clone(),
@@ -93,6 +131,18 @@ impl Descriptor {
             slash_d.clone(),
             format!(
                 "can-rx={}",
+                self.can_rx.clone().unwrap_or(String::from("NONE"))
+            ),
+            slash_d.clone(),
+            format!("can2={}", self.can.clone().unwrap_or(String::from("NONE"))),
+            slash_d.clone(),
+            format!(
+                "can2-tx={}",
+                self.can_tx.clone().unwrap_or(String::from("NONE"))
+            ),
+            slash_d.clone(),
+            format!(
+                "can2-rx={}",
                 self.can_rx.clone().unwrap_or(String::from("NONE"))
             ),
             slash_d.clone(),
@@ -113,12 +163,19 @@ impl Descriptor {
         if self.can.is_some() {
             args.push("can");
         }
+        if self.can2.is_some() {
+            args.push("can2");
+        }
 
         args.into_iter()
     }
 
     pub fn get_identity_json(&self) -> anyhow::Result<String> {
         Ok(serde_jcs::to_string(&DescriptorJson::from(self))?.to_kebab_case())
+    }
+
+    pub fn can_baudrate(&self) -> Option<u32> {
+        self.can_baudrate.as_deref().and_then(|s| s.parse().ok())
     }
 }
 
