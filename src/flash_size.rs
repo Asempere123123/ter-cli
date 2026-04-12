@@ -1,4 +1,4 @@
-use crate::descriptor::Descriptor;
+use crate::{descriptor::Descriptor, flash::FLASH_BASE_ADDR};
 use cached::proc_macro::cached;
 use serde_json::Value;
 
@@ -24,7 +24,7 @@ pub fn get_first_sector_size(desc: &Descriptor) -> anyhow::Result<u64> {
         .flatten()
         .filter(|memory| {
             memory["kind"].as_str() == Some("flash")
-                && memory["address"].as_u64() == Some(0x0800_0000)
+                && memory["address"].as_u64() == Some(FLASH_BASE_ADDR)
         })
         .next()
         .ok_or(anyhow::anyhow!("No flash sector found for this chip"))?;
