@@ -5,7 +5,8 @@ use probe_rs::{
     Error, Permissions, Session,
     probe::{DebugProbeError, DebugProbeInfo, ProbeCreationError, list::Lister},
 };
-use smol::{future::FutureExt, process::Command};
+use smol::{Timer, process::Command};
+use smol_timeout::TimeoutExt;
 use socketcan::{
     CanDataFrame, CanFrame, CanInterface, EmbeddedFrame, Id, StandardId, smol::CanSocket,
 };
@@ -138,13 +139,288 @@ async fn configure_can(baudrate: u32) -> anyhow::Result<String> {
 }
 
 async fn flash_can(descriptor: &Descriptor, mut app: Vec<u8>) -> anyhow::Result<()> {
-    app.resize(app.len().div_ceil(1024) * 1024, u8::MAX);
+    app.resize(
+        app.len().div_ceil(FLASH_SECTOR_WRITE_SIZE) * FLASH_SECTOR_WRITE_SIZE,
+        u8::MAX,
+    );
     let can_iface = configure_can(descriptor.can_baudrate().ok_or(anyhow::anyhow!(
         "No can baudrate specified. Have you set up the can stack in the ter.toml file?"
     ))?)
     .await?;
 
-    let can_socket = CanSocket::open(&can_iface)?;
+    let mut can_socket = CanSocket::open(&can_iface)?;
+
+    wait_bootloader_start(&mut can_socket, descriptor).await?;
+    send_flash_info_message(&mut can_socket, app.len() as u32).await?;
+    can_send_app_data(&mut can_socket, app).await?;
+
+    log::info!("Flashing success");
 
     Ok(())
+}
+
+async fn wait_bootloader_start(can: &mut CanSocket, descriptor: &Descriptor) -> anyhow::Result<()> {
+    let messaging_handle = smol::spawn(async {
+        loop {
+            log::info!("Waiting to enter bootloader mode");
+            Timer::after(Duration::from_millis(1000)).await;
+        }
+    });
+
+    loop {
+        can.write_frame(
+            &BeginCanFlashingMessage {
+                board_id: descriptor.name_hash(),
+            }
+            .to_frame(),
+        )
+        .await?;
+        if can_wait_ack(can)
+            .timeout(Duration::from_millis(200))
+            .await
+            .is_some()
+        {
+            break;
+        }
+    }
+
+    messaging_handle.cancel().await;
+    log::info!("Bootloader mode entered!");
+
+    Ok(())
+}
+
+async fn send_flash_info_message(can: &mut CanSocket, app_len: u32) -> anyhow::Result<()> {
+    can.write_frame(&BeginFlashInfoMessage { app_len }.to_frame())
+        .await?;
+
+    can_wait_ack(can).await;
+    log::info!("All info sent, erasing flash");
+
+    can_wait_ack(can).await;
+    log::info!("Flash erased, flashing");
+
+    Ok(())
+}
+
+async fn can_send_app_data(can: &mut CanSocket, app: Vec<u8>) -> anyhow::Result<()> {
+    let mut current_offset = 0;
+
+    while current_offset < app.len() {
+        can_send_whole_frame(can, &app, current_offset as u32).await?;
+
+        // Check if all frames where received
+        if can_wait_ack(can)
+            .timeout(Duration::from_millis(100))
+            .await
+            .is_none()
+        {
+            log::info!("Failed to write sector with offset 0x{:X}", current_offset);
+            can.write_frame(&RevertSectorMessage.to_frame()).await?;
+            can_wait_ack(can).await;
+            continue;
+        }
+
+        current_offset += FLASH_SECTOR_WRITE_SIZE;
+        // Wait to be able to send another frame
+        can_wait_ack(can).await;
+    }
+
+    log::info!("Finished writing to flash. Sending Done signal");
+    can.write_frame(&FlashFinishMessage.to_frame()).await?;
+    can_wait_ack(can).await;
+    Ok(())
+}
+
+async fn can_send_whole_frame(
+    can: &mut CanSocket,
+    app: &Vec<u8>,
+    offset: u32,
+) -> anyhow::Result<()> {
+    for i in (0..(FLASH_SECTOR_WRITE_SIZE)).step_by(7) {
+        let frame = FlashDataMessage {
+            index: i as u8,
+            data: bytemuck::pod_read_unaligned(
+                &app[(offset as usize + i)..(offset as usize + i + 7)],
+            ),
+        }
+        .to_frame();
+        can.write_frame(&frame).await?;
+    }
+
+    Ok(())
+}
+
+async fn can_wait_ack(can: &mut CanSocket) {
+    loop {
+        let Ok(frame) = can.read_frame().await else {
+            continue;
+        };
+
+        if AckMessage::try_from_frame(&frame).is_some() {
+            break;
+        }
+    }
+}
+
+//// Frame kind types
+
+const FLASH_SECTOR_WRITE_SIZE: usize = 32 * 7;
+
+pub struct BeginCanFlashingMessage {
+    board_id: u64,
+}
+
+impl BeginCanFlashingMessage {
+    const MESSAGE_ID: Id = Id::Standard(unsafe { StandardId::new_unchecked(0) });
+
+    #[allow(unused)]
+    pub fn try_from_frame(frame: &CanFrame) -> Option<Self> {
+        if frame.id() == Self::MESSAGE_ID {
+            Some(Self {
+                board_id: bytemuck::pod_read_unaligned(frame.data()),
+            })
+        } else {
+            None
+        }
+    }
+
+    #[allow(unused)]
+    pub fn to_frame(self) -> CanDataFrame {
+        let Some(frame) = CanDataFrame::new(Self::MESSAGE_ID, bytemuck::bytes_of(&self.board_id))
+        else {
+            panic!()
+        };
+
+        frame
+    }
+}
+
+pub struct AckMessage;
+
+impl AckMessage {
+    const MESSAGE_ID: Id = Id::Standard(unsafe { StandardId::new_unchecked(1) });
+
+    #[allow(unused)]
+    pub fn try_from_frame(frame: &CanFrame) -> Option<Self> {
+        if frame.id() == Self::MESSAGE_ID {
+            Some(Self)
+        } else {
+            None
+        }
+    }
+
+    #[allow(unused)]
+    pub fn to_frame(self) -> CanDataFrame {
+        let Some(frame) = CanDataFrame::new(Self::MESSAGE_ID, &[]) else {
+            panic!()
+        };
+
+        frame
+    }
+}
+
+#[repr(C)]
+#[derive(bytemuck::AnyBitPattern, bytemuck::NoUninit, Clone, Copy)]
+pub struct FlashDataMessage {
+    index: u8,
+    data: [u8; 7],
+}
+
+impl FlashDataMessage {
+    const MESSAGE_ID: Id = Id::Standard(unsafe { StandardId::new_unchecked(2) });
+
+    #[allow(unused)]
+    pub fn try_from_frame(frame: &CanFrame) -> Option<Self> {
+        if frame.id() == Self::MESSAGE_ID {
+            Some(bytemuck::pod_read_unaligned(frame.data()))
+        } else {
+            None
+        }
+    }
+
+    #[allow(unused)]
+    pub fn to_frame(self) -> CanDataFrame {
+        let Some(frame) = CanDataFrame::new(Self::MESSAGE_ID, bytemuck::bytes_of(&self)) else {
+            panic!()
+        };
+
+        frame
+    }
+}
+
+#[repr(C)]
+#[derive(bytemuck::AnyBitPattern, bytemuck::NoUninit, Clone, Copy)]
+pub struct BeginFlashInfoMessage {
+    app_len: u32,
+}
+
+impl BeginFlashInfoMessage {
+    const MESSAGE_ID: Id = Id::Standard(unsafe { StandardId::new_unchecked(3) });
+
+    #[allow(unused)]
+    pub fn try_from_frame(frame: &CanFrame) -> Option<Self> {
+        if frame.id() == Self::MESSAGE_ID {
+            Some(bytemuck::pod_read_unaligned(frame.data()))
+        } else {
+            None
+        }
+    }
+
+    #[allow(unused)]
+    pub fn to_frame(self) -> CanDataFrame {
+        let Some(frame) = CanDataFrame::new(Self::MESSAGE_ID, bytemuck::bytes_of(&self)) else {
+            panic!()
+        };
+
+        frame
+    }
+}
+
+pub struct FlashFinishMessage;
+
+impl FlashFinishMessage {
+    const MESSAGE_ID: Id = Id::Standard(unsafe { StandardId::new_unchecked(4) });
+
+    #[allow(unused)]
+    pub fn try_from_frame(frame: &CanFrame) -> Option<Self> {
+        if frame.id() == Self::MESSAGE_ID {
+            Some(Self)
+        } else {
+            None
+        }
+    }
+
+    #[allow(unused)]
+    pub fn to_frame(self) -> CanDataFrame {
+        let Some(frame) = CanDataFrame::new(Self::MESSAGE_ID, &[]) else {
+            panic!()
+        };
+
+        frame
+    }
+}
+
+pub struct RevertSectorMessage;
+
+impl RevertSectorMessage {
+    const MESSAGE_ID: Id = Id::Standard(unsafe { StandardId::new_unchecked(5) });
+
+    #[allow(unused)]
+    pub fn try_from_frame(frame: &CanFrame) -> Option<Self> {
+        if frame.id() == Self::MESSAGE_ID {
+            Some(Self)
+        } else {
+            None
+        }
+    }
+
+    #[allow(unused)]
+    pub fn to_frame(self) -> CanDataFrame {
+        let Some(frame) = CanDataFrame::new(Self::MESSAGE_ID, &[]) else {
+            panic!()
+        };
+
+        frame
+    }
 }
