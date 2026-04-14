@@ -183,6 +183,9 @@ pub struct DescriptorJson<'a> {
     can: &'a Option<String>,
     can_tx: &'a Option<String>,
     can_rx: &'a Option<String>,
+    can2: &'a Option<String>,
+    can2_tx: &'a Option<String>,
+    can2_rx: &'a Option<String>,
     can_baudrate: &'a Option<String>,
 }
 
@@ -194,6 +197,9 @@ impl<'a> From<&'a Descriptor> for DescriptorJson<'a> {
             can: &d.can,
             can_tx: &d.can_tx,
             can_rx: &d.can_rx,
+            can2: &d.can2,
+            can2_tx: &d.can2_tx,
+            can2_rx: &d.can2_rx,
             can_baudrate: &d.can_baudrate,
         }
     }

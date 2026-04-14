@@ -30,6 +30,10 @@ pub fn flash(
     log::info!("Flashing App");
     let bootloader = std::fs::read(bootloader_path)?;
     let app = std::fs::read(app_path)?;
+    if bootloader.len() > flash_size::get_first_sector_size(&descriptor)? as usize {
+        // (An option to set this to 32Ks or the next reasonable number could be added in the future)
+        anyhow::bail!("Currently built bootloader can't fit on its allocated size");
+    }
 
     if can {
         smol::block_on(flash_can(descriptor, app))?;
