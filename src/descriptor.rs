@@ -131,16 +131,16 @@ impl Descriptor {
                 self.can_rx.clone().unwrap_or(String::from("NONE"))
             ),
             slash_d.clone(),
-            format!("can2={}", self.can.clone().unwrap_or(String::from("NONE"))),
+            format!("can2={}", self.can2.clone().unwrap_or(String::from("NONE"))),
             slash_d.clone(),
             format!(
                 "can2-tx={}",
-                self.can_tx.clone().unwrap_or(String::from("NONE"))
+                self.can2_tx.clone().unwrap_or(String::from("NONE"))
             ),
             slash_d.clone(),
             format!(
                 "can2-rx={}",
-                self.can_rx.clone().unwrap_or(String::from("NONE"))
+                self.can2_rx.clone().unwrap_or(String::from("NONE"))
             ),
             slash_d.clone(),
             format!(
