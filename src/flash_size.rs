@@ -2,7 +2,7 @@ use crate::{descriptor::Descriptor, flash::FLASH_BASE_ADDR};
 use cached::proc_macro::cached;
 use serde_json::Value;
 
-const MIN_BOOTLOADER_SIZE: u64 = 16 * 1024;
+const DEFAULT_BOOTLOADER_SIZE: u64 = 16;
 
 #[cached(
     key = "String",
@@ -29,8 +29,18 @@ pub fn get_first_sector_size(desc: &Descriptor) -> anyhow::Result<u64> {
         .next()
         .ok_or(anyhow::anyhow!("No flash sector found for this chip"))?;
 
-    first_flash["settings"]["erase_size"]
+    let first_flash_size = first_flash["settings"]["erase_size"]
         .as_u64()
-        .map(|flash_size| flash_size.max(MIN_BOOTLOADER_SIZE))
-        .ok_or(anyhow::anyhow!("First sector size not found"))
+        .ok_or(anyhow::anyhow!("First sector size not found"))?;
+
+    let required_bootloader_size = desc.flash_size().unwrap_or(DEFAULT_BOOTLOADER_SIZE);
+
+    if (required_bootloader_size * 1024) % first_flash_size != 0 {
+        anyhow::bail!(
+            "Specified bootloader size is not a multiple of the erase size, which is {}K",
+            first_flash_size / 1024
+        );
+    }
+
+    Ok(required_bootloader_size * 1024)
 }

@@ -23,6 +23,7 @@ pub struct Descriptor {
     can2_rx: Option<String>,
     can_baudrate: Option<String>,
     string_rtt: Option<bool>,
+    flash_size: Option<u64>,
 }
 
 impl Descriptor {
@@ -84,6 +85,10 @@ impl Descriptor {
         } else {
             Err(anyhow::anyhow!("No cores found for this chip"))
         }
+    }
+
+    pub fn flash_size(&self) -> &Option<u64> {
+        &self.flash_size
     }
 
     pub fn bin_path(&self) -> &Option<PathBuf> {
@@ -187,6 +192,7 @@ pub struct DescriptorJson<'a> {
     can2_tx: &'a Option<String>,
     can2_rx: &'a Option<String>,
     can_baudrate: &'a Option<String>,
+    flash_size: &'a Option<u64>,
 }
 
 impl<'a> From<&'a Descriptor> for DescriptorJson<'a> {
@@ -201,6 +207,7 @@ impl<'a> From<&'a Descriptor> for DescriptorJson<'a> {
             can2_tx: &d.can2_tx,
             can2_rx: &d.can2_rx,
             can_baudrate: &d.can_baudrate,
+            flash_size: &d.flash_size,
         }
     }
 }

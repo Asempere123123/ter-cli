@@ -65,15 +65,12 @@ fn generate_new_bootloader(descriptor: &Descriptor, defmt: bool) -> anyhow::Resu
         &format!("chip-hal-name={}", descriptor.chip_hal_name()),
         "-d",
         &format!("chip-arch={}", descriptor.chip_arch_name()?),
-    ]);
-    if defmt {
-        cargo_generate_cmd.args(["-d", "flash-size=40"]);
-    } else {
-        cargo_generate_cmd.arg("-d").arg(format!(
+        "-d",
+        &format!(
             "flash-size={}",
             flash_size::get_first_sector_size(descriptor)? / 1024
-        ));
-    }
+        ),
+    ]);
     cargo_generate_cmd.args(descriptor.get_generate_args());
     let status = cargo_generate_cmd
         .current_dir(DIRS.data_dir())

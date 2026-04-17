@@ -24,15 +24,17 @@ pub fn flash(
     descriptor: &Descriptor,
 ) -> anyhow::Result<Session> {
     log::info!(
-        "FLASH_ERASE_SIZE = {}",
-        flash_size::get_first_sector_size(&descriptor)?
+        "FLASH_ERASE_SIZE = {}K",
+        flash_size::get_first_sector_size(&descriptor)? / 1024
     );
     log::info!("Flashing App");
     let bootloader = std::fs::read(bootloader_path)?;
     let app = std::fs::read(app_path)?;
     if bootloader.len() > flash_size::get_first_sector_size(&descriptor)? as usize {
-        // (An option to set this to 32Ks or the next reasonable number could be added in the future)
-        anyhow::bail!("Currently built bootloader can't fit on its allocated size");
+        anyhow::bail!(
+            "Currently built bootloader can't fit on its allocated size. It's size is {}K",
+            bootloader.len() / 1024
+        );
     }
 
     if can {
@@ -249,7 +251,7 @@ async fn can_send_whole_frame(
             ),
         }
         .to_frame();
-        can.write_frame(&frame).await?;
+        while can.write_frame(&frame).await.is_err() {}
     }
 
     Ok(())
