@@ -278,7 +278,7 @@ pub struct BeginCanFlashingMessage {
 }
 
 impl BeginCanFlashingMessage {
-    const MESSAGE_ID: Id = Id::Standard(unsafe { StandardId::new_unchecked(0) });
+    const MESSAGE_ID: Id = Id::Standard(unsafe { StandardId::new_unchecked(0x303) });
 
     #[allow(unused)]
     pub fn try_from_frame(frame: &CanFrame) -> Option<Self> {
@@ -305,7 +305,7 @@ impl BeginCanFlashingMessage {
 pub struct AckMessage;
 
 impl AckMessage {
-    const MESSAGE_ID: Id = Id::Standard(unsafe { StandardId::new_unchecked(1) });
+    const MESSAGE_ID: Id = Id::Standard(unsafe { StandardId::new_unchecked(0x304) });
 
     #[allow(unused)]
     pub fn try_from_frame(frame: &CanFrame) -> Option<Self> {
@@ -334,7 +334,7 @@ pub struct FlashDataMessage {
 }
 
 impl FlashDataMessage {
-    const MESSAGE_ID: Id = Id::Standard(unsafe { StandardId::new_unchecked(2) });
+    const MESSAGE_ID: Id = Id::Standard(unsafe { StandardId::new_unchecked(0x305) });
 
     #[allow(unused)]
     pub fn try_from_frame(frame: &CanFrame) -> Option<Self> {
@@ -362,7 +362,7 @@ pub struct BeginFlashInfoMessage {
 }
 
 impl BeginFlashInfoMessage {
-    const MESSAGE_ID: Id = Id::Standard(unsafe { StandardId::new_unchecked(3) });
+    const MESSAGE_ID: Id = Id::Standard(unsafe { StandardId::new_unchecked(0x306) });
 
     #[allow(unused)]
     pub fn try_from_frame(frame: &CanFrame) -> Option<Self> {
@@ -386,7 +386,7 @@ impl BeginFlashInfoMessage {
 pub struct FlashFinishMessage;
 
 impl FlashFinishMessage {
-    const MESSAGE_ID: Id = Id::Standard(unsafe { StandardId::new_unchecked(4) });
+    const MESSAGE_ID: Id = Id::Standard(unsafe { StandardId::new_unchecked(0x307) });
 
     #[allow(unused)]
     pub fn try_from_frame(frame: &CanFrame) -> Option<Self> {
@@ -410,7 +410,7 @@ impl FlashFinishMessage {
 pub struct RevertSectorMessage;
 
 impl RevertSectorMessage {
-    const MESSAGE_ID: Id = Id::Standard(unsafe { StandardId::new_unchecked(5) });
+    const MESSAGE_ID: Id = Id::Standard(unsafe { StandardId::new_unchecked(0x308) });
 
     #[allow(unused)]
     pub fn try_from_frame(frame: &CanFrame) -> Option<Self> {

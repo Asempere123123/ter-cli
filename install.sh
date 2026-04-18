@@ -1,6 +1,6 @@
 #!/bin/bash
 
-URL="https://github.com/Asempere123123/ter-cli/releases/download/v0.1.0/ter-cli"
+URL="https://github.com/Asempere123123/ter-cli/releases/download/v0.1.1/ter-cli"
 FILENAME="ter"
 TARGET_DIR="/usr/local/bin"
 
