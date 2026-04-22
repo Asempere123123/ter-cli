@@ -1,5 +1,3 @@
-use std::{path::Path, time::Duration, u8};
-
 use nix::net::if_::if_nameindex;
 use probe_rs::{
     Error, Permissions, Session,
@@ -10,6 +8,7 @@ use smol_timeout::TimeoutExt;
 use socketcan::{
     CanDataFrame, CanFrame, CanInterface, EmbeddedFrame, Id, StandardId, smol::CanSocket,
 };
+use std::{path::Path, time::Duration, u8};
 
 use crate::{descriptor::Descriptor, flash_size};
 
@@ -22,6 +21,7 @@ pub fn flash(
     bootloader_defmt: bool,
     can: bool,
     descriptor: &Descriptor,
+    throttle: Option<u64>,
 ) -> anyhow::Result<Session> {
     log::info!(
         "FLASH_ERASE_SIZE = {}K",
@@ -38,7 +38,7 @@ pub fn flash(
     }
 
     if can {
-        smol::block_on(flash_can(descriptor, app))?;
+        smol::block_on(flash_can(descriptor, app, throttle))?;
         // No puede retornar la sesion, no hay nada mas que hacer (pq no esta enchufado)
         std::process::exit(0);
     }
@@ -144,7 +144,11 @@ async fn configure_can(baudrate: u32) -> anyhow::Result<String> {
     Ok(can_interface)
 }
 
-async fn flash_can(descriptor: &Descriptor, mut app: Vec<u8>) -> anyhow::Result<()> {
+async fn flash_can(
+    descriptor: &Descriptor,
+    mut app: Vec<u8>,
+    throttle: Option<u64>,
+) -> anyhow::Result<()> {
     app.resize(
         app.len().div_ceil(FLASH_SECTOR_WRITE_SIZE) * FLASH_SECTOR_WRITE_SIZE,
         u8::MAX,
@@ -158,7 +162,7 @@ async fn flash_can(descriptor: &Descriptor, mut app: Vec<u8>) -> anyhow::Result<
 
     wait_bootloader_start(&mut can_socket, descriptor).await?;
     send_flash_info_message(&mut can_socket, app.len() as u32).await?;
-    can_send_app_data(&mut can_socket, app).await?;
+    can_send_app_data(&mut can_socket, app, throttle).await?;
 
     log::info!("Flashing success");
 
@@ -209,11 +213,15 @@ async fn send_flash_info_message(can: &mut CanSocket, app_len: u32) -> anyhow::R
     Ok(())
 }
 
-async fn can_send_app_data(can: &mut CanSocket, app: Vec<u8>) -> anyhow::Result<()> {
+async fn can_send_app_data(
+    can: &mut CanSocket,
+    app: Vec<u8>,
+    throttle: Option<u64>,
+) -> anyhow::Result<()> {
     let mut current_offset = 0;
 
     while current_offset < app.len() {
-        can_send_whole_frame(can, &app, current_offset as u32).await?;
+        can_send_whole_frame(can, &app, current_offset as u32, throttle).await?;
 
         // Check if all frames where received
         if can_wait_ack(can)
@@ -242,6 +250,7 @@ async fn can_send_whole_frame(
     can: &mut CanSocket,
     app: &Vec<u8>,
     offset: u32,
+    throttle: Option<u64>,
 ) -> anyhow::Result<()> {
     for i in (0..(FLASH_SECTOR_WRITE_SIZE)).step_by(7) {
         let frame = FlashDataMessage {
@@ -252,6 +261,9 @@ async fn can_send_whole_frame(
         }
         .to_frame();
         while can.write_frame(&frame).await.is_err() {}
+        if let Some(micros) = throttle {
+            smol::Timer::after(Duration::from_micros(micros)).await;
+        }
     }
 
     Ok(())

@@ -50,6 +50,9 @@ enum Commands {
         #[arg(short, long)]
         /// Flash via can. Requires having flashed the bootloader via ter run/flash before
         can: bool,
+        #[arg(short, long)]
+        /// Throttle can messages. If can flashing isn't working, it can be the case that the chip isnt fast enough to receive all of them
+        throttle: Option<u64>,
     },
     /// Flash binary
     Flash {
@@ -68,6 +71,9 @@ enum Commands {
         #[arg(short, long)]
         /// Flash via can. Requires having flashed the bootloader via ter run/flash before
         can: bool,
+        #[arg(short, long)]
+        /// Throttle can messages. If can flashing isn't working, it can be the case that the chip isnt fast enough to receive all of them
+        throttle: Option<u64>,
     },
     /// Attach without doing anything else
     Attach {
@@ -89,7 +95,15 @@ fn main() -> anyhow::Result<()> {
     env_logger::init_from_env(env_logger::Env::default().default_filter_or("info"));
 
     let cli = Cli::parse();
-    let descriptor = Descriptor::from_path(cli.path).unwrap();
+    let descriptor = match Descriptor::from_path(cli.path) {
+        Ok(desc) => desc,
+        Err(e) => {
+            println!(
+                "Invalid or non existant ter.toml file. For correct configuration check the README.md https://github.com/Asempere123123/ter-cli/blob/main/README.md"
+            );
+            return Err(e);
+        }
+    };
 
     match cli.command {
         Commands::Run {
@@ -98,6 +112,7 @@ fn main() -> anyhow::Result<()> {
             bootloader_defmt,
             bootloader_path,
             can,
+            throttle,
         } => {
             if let Some(build_cmd) = descriptor.build_command() {
                 let status = Command::new("sh")
@@ -121,6 +136,7 @@ fn main() -> anyhow::Result<()> {
                 bootloader_path,
                 &descriptor,
                 can,
+                throttle,
             )?;
         }
         Commands::Flash {
@@ -129,6 +145,7 @@ fn main() -> anyhow::Result<()> {
             bootloader_defmt,
             bootloader_path,
             can,
+            throttle,
         } => flash_command(
             bin_path,
             defmt,
@@ -136,6 +153,7 @@ fn main() -> anyhow::Result<()> {
             bootloader_path,
             &descriptor,
             can,
+            throttle,
         )?,
         Commands::Attach {
             defmt,
@@ -170,6 +188,7 @@ fn flash_command(
     bootloader_path: Option<PathBuf>,
     descriptor: &Descriptor,
     can: bool,
+    throttle: Option<u64>,
 ) -> anyhow::Result<()> {
     let (bootloader_bin_path, bootloader_elf_path) =
         get_bootloader_path(bootloader_path, &descriptor, bootloader_defmt)?;
@@ -183,6 +202,7 @@ fn flash_command(
             bootloader_defmt,
             can,
             descriptor,
+            throttle,
         )?;
     } else if let Some(bin_path) = descriptor.bin_path() {
         session = flash::flash(
@@ -192,6 +212,7 @@ fn flash_command(
             bootloader_defmt,
             can,
             descriptor,
+            throttle,
         )?;
     } else {
         log::warn!(
