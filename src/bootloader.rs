@@ -17,7 +17,7 @@ pub fn get_bootloader_path(
         dir_name.push_str("-defmt");
     }
     dir_name.push_str("-");
-    dir_name.push_str(&descriptor.get_identity_json()?);
+    dir_name.push_str(&descriptor.get_identity()?);
     let mut target_dir = DIRS.data_dir().join(&dir_name);
     if let Some(path) = bootloader_path {
         target_dir = path;
@@ -51,7 +51,7 @@ fn generate_new_bootloader(descriptor: &Descriptor, defmt: bool) -> anyhow::Resu
         dir_name.push_str("-defmt");
     }
     dir_name.push_str("-");
-    dir_name.push_str(&descriptor.get_identity_json()?);
+    dir_name.push_str(&descriptor.get_identity()?);
 
     let mut cargo_generate_cmd = Command::new("cargo");
     cargo_generate_cmd.args([

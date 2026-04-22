@@ -1,11 +1,9 @@
+use probe_rs::{CoreType, config::Registry};
+use serde::{Deserialize, Serialize};
 use std::{
     hash::{DefaultHasher, Hash, Hasher},
     path::{Path, PathBuf},
 };
-
-use heck::ToKebabCase;
-use probe_rs::{CoreType, config::Registry};
-use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Descriptor {
@@ -217,8 +215,9 @@ impl Descriptor {
         args.into_iter()
     }
 
-    pub fn get_identity_json(&self) -> anyhow::Result<String> {
-        Ok(serde_jcs::to_string(&DescriptorJson::from(self))?.to_kebab_case())
+    pub fn get_identity(&self) -> anyhow::Result<String> {
+        let digest = md5::compute(serde_jcs::to_string(&DescriptorJson::from(self))?);
+        Ok(format!("{:x}", digest))
     }
 
     pub fn can_baudrate(&self) -> Option<u32> {
