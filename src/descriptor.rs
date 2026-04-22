@@ -16,6 +16,7 @@ pub struct Descriptor {
     build_command: Option<String>,
     hse: Option<String>,
     can: Option<String>,
+    can_int_name: Option<String>,
     can_tx: Option<String>,
     can_rx: Option<String>,
     can2: Option<String>,
@@ -53,6 +54,10 @@ impl Descriptor {
             anyhow::bail!(
                 r#"Either all "can2", "can2_tx", "can2_rx", "can_baudrate" must be defined or none in ter.toml"#
             );
+        }
+
+        if desc.can_int_name.is_some() && desc.can.is_none() {
+            anyhow::bail!(r#"If can_int_name is set can must be set"#);
         }
 
         Ok(desc)
@@ -127,6 +132,14 @@ impl Descriptor {
             format!("can={}", self.can.clone().unwrap_or(String::from("NONE"))),
             slash_d.clone(),
             format!(
+                "can-int-name={}",
+                self.can_int_name
+                    .clone()
+                    .or(self.can.clone())
+                    .unwrap_or(String::from("NONE"))
+            ),
+            slash_d.clone(),
+            format!(
                 "can-tx={}",
                 self.can_tx.clone().unwrap_or(String::from("NONE"))
             ),
@@ -186,6 +199,7 @@ pub struct DescriptorJson<'a> {
     project_name: &'a String,
     hse: &'a Option<String>,
     can: &'a Option<String>,
+    can_int_name: &'a Option<String>,
     can_tx: &'a Option<String>,
     can_rx: &'a Option<String>,
     can2: &'a Option<String>,
@@ -201,6 +215,7 @@ impl<'a> From<&'a Descriptor> for DescriptorJson<'a> {
             project_name: &d.project_name,
             hse: &d.hse,
             can: &d.can,
+            can_int_name: &d.can_int_name,
             can_tx: &d.can_tx,
             can_rx: &d.can_rx,
             can2: &d.can2,
