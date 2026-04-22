@@ -16,7 +16,10 @@ pub struct Descriptor {
     build_command: Option<String>,
     hse: Option<String>,
     can: Option<String>,
-    can_int_name: Option<String>,
+    can_tx_int_name: Option<String>,
+    can_rx0_int_name: Option<String>,
+    can_rx1_int_name: Option<String>,
+    can_sce_int_name: Option<String>,
     can_tx: Option<String>,
     can_rx: Option<String>,
     can2: Option<String>,
@@ -56,8 +59,13 @@ impl Descriptor {
             );
         }
 
-        if desc.can_int_name.is_some() && desc.can.is_none() {
-            anyhow::bail!(r#"If can_int_name is set can must be set"#);
+        if (desc.can_tx_int_name.is_some()
+            || desc.can_rx0_int_name.is_some()
+            || desc.can_rx1_int_name.is_some()
+            || desc.can_sce_int_name.is_some())
+            && desc.can.is_none()
+        {
+            anyhow::bail!(r#"If any can_*_int_name is set can must be set"#);
         }
 
         Ok(desc)
@@ -132,10 +140,34 @@ impl Descriptor {
             format!("can={}", self.can.clone().unwrap_or(String::from("NONE"))),
             slash_d.clone(),
             format!(
-                "can-int-name={}",
-                self.can_int_name
+                "can-tx-int-name={}",
+                self.can_tx_int_name
                     .clone()
-                    .or(self.can.clone())
+                    .or(self.can.as_ref().map(|can| format!("{}_TX", can.as_str())))
+                    .unwrap_or(String::from("NONE"))
+            ),
+            slash_d.clone(),
+            format!(
+                "can-rx0-int-name={}",
+                self.can_rx0_int_name
+                    .clone()
+                    .or(self.can.as_ref().map(|can| format!("{}_RX0", can.as_str())))
+                    .unwrap_or(String::from("NONE"))
+            ),
+            slash_d.clone(),
+            format!(
+                "can-rx1-int-name={}",
+                self.can_rx1_int_name
+                    .clone()
+                    .or(self.can.as_ref().map(|can| format!("{}_RX1", can.as_str())))
+                    .unwrap_or(String::from("NONE"))
+            ),
+            slash_d.clone(),
+            format!(
+                "can-sce-int-name={}",
+                self.can_sce_int_name
+                    .clone()
+                    .or(self.can.as_ref().map(|can| format!("{}_SCE", can.as_str())))
                     .unwrap_or(String::from("NONE"))
             ),
             slash_d.clone(),
@@ -199,7 +231,10 @@ pub struct DescriptorJson<'a> {
     project_name: &'a String,
     hse: &'a Option<String>,
     can: &'a Option<String>,
-    can_int_name: &'a Option<String>,
+    can_tx_int_name: &'a Option<String>,
+    can_rx0_int_name: &'a Option<String>,
+    can_rx1_int_name: &'a Option<String>,
+    can_sce_int_name: &'a Option<String>,
     can_tx: &'a Option<String>,
     can_rx: &'a Option<String>,
     can2: &'a Option<String>,
@@ -215,7 +250,10 @@ impl<'a> From<&'a Descriptor> for DescriptorJson<'a> {
             project_name: &d.project_name,
             hse: &d.hse,
             can: &d.can,
-            can_int_name: &d.can_int_name,
+            can_tx_int_name: &d.can_tx_int_name,
+            can_rx0_int_name: &d.can_rx0_int_name,
+            can_rx1_int_name: &d.can_rx1_int_name,
+            can_sce_int_name: &d.can_sce_int_name,
             can_tx: &d.can_tx,
             can_rx: &d.can_rx,
             can2: &d.can2,
