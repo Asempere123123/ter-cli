@@ -9,7 +9,7 @@ const DEFAULT_BOOTLOADER_SIZE: u64 = 16;
     convert = r#"{ desc.chip_name().to_owned() }"#,
     result = true
 )]
-pub fn get_first_sector_size(desc: &Descriptor) -> anyhow::Result<u64> {
+pub fn get_first_sector_erase_and_write_size(desc: &Descriptor) -> anyhow::Result<Sizes> {
     let res = reqwest::blocking::get(format!(
         "https://raw.githubusercontent.com/embassy-rs/stm32-data-generated/refs/heads/main/data/chips/{}.json",
         desc.chip_name()
@@ -42,5 +42,21 @@ pub fn get_first_sector_size(desc: &Descriptor) -> anyhow::Result<u64> {
         );
     }
 
-    Ok(required_bootloader_size * 1024)
+    let Some(write_size) = first_flash["settings"]["write_size"]
+        .as_u64()
+        .map(|size| size as u8)
+    else {
+        anyhow::bail!("Write size for current chip not found");
+    };
+
+    Ok(Sizes {
+        erase_size: required_bootloader_size * 1024,
+        write_size,
+    })
+}
+
+#[derive(Clone, Copy)]
+pub struct Sizes {
+    pub erase_size: u64,
+    pub write_size: u8,
 }

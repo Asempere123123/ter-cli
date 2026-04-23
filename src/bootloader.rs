@@ -68,7 +68,7 @@ fn generate_new_bootloader(descriptor: &Descriptor, defmt: bool) -> anyhow::Resu
         "-d",
         &format!(
             "flash-size={}",
-            flash_size::get_first_sector_size(descriptor)? / 1024
+            flash_size::get_first_sector_erase_and_write_size(descriptor)?.erase_size / 1024
         ),
     ]);
     cargo_generate_cmd.args(descriptor.get_generate_args());

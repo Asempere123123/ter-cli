@@ -53,6 +53,9 @@ enum Commands {
         #[arg(short, long)]
         /// Throttle can messages. If can flashing isn't working, it can be the case that the chip isnt fast enough to receive all of them
         throttle: Option<u64>,
+        #[arg(short, long)]
+        /// The amount of can messages that are sent before commiting to flash
+        sector_size: Option<u8>,
     },
     /// Flash binary
     Flash {
@@ -74,6 +77,9 @@ enum Commands {
         #[arg(short, long)]
         /// Throttle can messages. If can flashing isn't working, it can be the case that the chip isnt fast enough to receive all of them
         throttle: Option<u64>,
+        #[arg(short, long)]
+        /// The amount of can messages that are sent before commiting to flash
+        sector_size: Option<u8>,
     },
     /// Attach without doing anything else
     Attach {
@@ -113,6 +119,7 @@ fn main() -> anyhow::Result<()> {
             bootloader_path,
             can,
             throttle,
+            sector_size,
         } => {
             if let Some(build_cmd) = descriptor.build_command() {
                 let status = Command::new("sh")
@@ -137,6 +144,7 @@ fn main() -> anyhow::Result<()> {
                 &descriptor,
                 can,
                 throttle,
+                sector_size,
             )?;
         }
         Commands::Flash {
@@ -146,6 +154,7 @@ fn main() -> anyhow::Result<()> {
             bootloader_path,
             can,
             throttle,
+            sector_size,
         } => flash_command(
             bin_path,
             defmt,
@@ -154,6 +163,7 @@ fn main() -> anyhow::Result<()> {
             &descriptor,
             can,
             throttle,
+            sector_size,
         )?,
         Commands::Attach {
             defmt,
@@ -189,6 +199,7 @@ fn flash_command(
     descriptor: &Descriptor,
     can: bool,
     throttle: Option<u64>,
+    sector_size: Option<u8>,
 ) -> anyhow::Result<()> {
     let (bootloader_bin_path, bootloader_elf_path) =
         get_bootloader_path(bootloader_path, &descriptor, bootloader_defmt)?;
@@ -203,6 +214,7 @@ fn flash_command(
             can,
             descriptor,
             throttle,
+            sector_size,
         )?;
     } else if let Some(bin_path) = descriptor.bin_path() {
         session = flash::flash(
@@ -213,6 +225,7 @@ fn flash_command(
             can,
             descriptor,
             throttle,
+            sector_size,
         )?;
     } else {
         log::warn!(

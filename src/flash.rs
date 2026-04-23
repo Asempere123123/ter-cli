@@ -13,6 +13,7 @@ use std::{path::Path, time::Duration, u8};
 use crate::{descriptor::Descriptor, flash_size};
 
 pub const FLASH_BASE_ADDR: u64 = 0x08000000;
+pub const DEFAULT_SECTOR_SIZE: u8 = 16;
 
 pub fn flash(
     bootloader_path: impl AsRef<Path>,
@@ -22,15 +23,18 @@ pub fn flash(
     can: bool,
     descriptor: &Descriptor,
     throttle: Option<u64>,
+    sector_size: Option<u8>,
 ) -> anyhow::Result<Session> {
     log::info!(
         "FLASH_ERASE_SIZE = {}K",
-        flash_size::get_first_sector_size(&descriptor)? / 1024
+        flash_size::get_first_sector_erase_and_write_size(&descriptor)?.erase_size / 1024
     );
     log::info!("Flashing App");
     let bootloader = std::fs::read(bootloader_path)?;
     let app = std::fs::read(app_path)?;
-    if bootloader.len() > flash_size::get_first_sector_size(&descriptor)? as usize {
+    if bootloader.len()
+        > flash_size::get_first_sector_erase_and_write_size(&descriptor)?.erase_size as usize
+    {
         anyhow::bail!(
             "Currently built bootloader can't fit on its allocated size. It's size is {}K",
             bootloader.len() / 1024
@@ -38,7 +42,22 @@ pub fn flash(
     }
 
     if can {
-        smol::block_on(flash_can(descriptor, app, throttle))?;
+        // TODO: assert that it is under 32 as that is the hardcoded max in the bootloader code
+        if sector_size.unwrap_or(DEFAULT_SECTOR_SIZE)
+            % flash_size::get_first_sector_erase_and_write_size(&descriptor)?.write_size
+            != 0
+        {
+            anyhow::bail!(
+                "Currently selected sector size is not a multiple of the write size, which is {}",
+                flash_size::get_first_sector_erase_and_write_size(&descriptor)?.write_size
+            );
+        }
+        smol::block_on(flash_can(
+            descriptor,
+            app,
+            throttle,
+            sector_size.unwrap_or(DEFAULT_SECTOR_SIZE),
+        ))?;
         // No puede retornar la sesion, no hay nada mas que hacer (pq no esta enchufado)
         std::process::exit(0);
     }
@@ -49,7 +68,8 @@ pub fn flash(
     loader.add_data(FLASH_BASE_ADDR, &bootloader)?;
     if !bootloader_defmt {
         loader.add_data(
-            FLASH_BASE_ADDR + flash_size::get_first_sector_size(&descriptor)?,
+            FLASH_BASE_ADDR
+                + flash_size::get_first_sector_erase_and_write_size(&descriptor)?.erase_size,
             &app,
         )?;
     }
@@ -148,9 +168,10 @@ async fn flash_can(
     descriptor: &Descriptor,
     mut app: Vec<u8>,
     throttle: Option<u64>,
+    sector_size: u8,
 ) -> anyhow::Result<()> {
     app.resize(
-        app.len().div_ceil(FLASH_SECTOR_WRITE_SIZE) * FLASH_SECTOR_WRITE_SIZE,
+        app.len().div_ceil(sector_size as usize * 7) * (sector_size as usize * 7),
         u8::MAX,
     );
     let can_iface = configure_can(descriptor.can_baudrate().ok_or(anyhow::anyhow!(
@@ -161,8 +182,8 @@ async fn flash_can(
     let mut can_socket = CanSocket::open(&can_iface)?;
 
     wait_bootloader_start(&mut can_socket, descriptor).await?;
-    send_flash_info_message(&mut can_socket, app.len() as u32).await?;
-    can_send_app_data(&mut can_socket, app, throttle).await?;
+    send_flash_info_message(&mut can_socket, app.len() as u32, sector_size).await?;
+    can_send_app_data(&mut can_socket, app, throttle, sector_size).await?;
 
     log::info!("Flashing success");
 
@@ -200,9 +221,19 @@ async fn wait_bootloader_start(can: &mut CanSocket, descriptor: &Descriptor) -> 
     Ok(())
 }
 
-async fn send_flash_info_message(can: &mut CanSocket, app_len: u32) -> anyhow::Result<()> {
-    can.write_frame(&BeginFlashInfoMessage { app_len }.to_frame())
-        .await?;
+async fn send_flash_info_message(
+    can: &mut CanSocket,
+    app_len: u32,
+    sector_size: u8,
+) -> anyhow::Result<()> {
+    can.write_frame(
+        &BeginFlashInfoMessage {
+            app_len,
+            sector_size,
+        }
+        .to_frame(),
+    )
+    .await?;
 
     can_wait_ack(can).await;
     log::info!("All info sent, erasing flash");
@@ -217,11 +248,12 @@ async fn can_send_app_data(
     can: &mut CanSocket,
     app: Vec<u8>,
     throttle: Option<u64>,
+    sector_size: u8,
 ) -> anyhow::Result<()> {
     let mut current_offset = 0;
 
     while current_offset < app.len() {
-        can_send_whole_frame(can, &app, current_offset as u32, throttle).await?;
+        can_send_whole_frame(can, &app, current_offset as u32, throttle, sector_size).await?;
 
         // Check if all frames where received
         if can_wait_ack(can)
@@ -235,7 +267,7 @@ async fn can_send_app_data(
             continue;
         }
 
-        current_offset += FLASH_SECTOR_WRITE_SIZE;
+        current_offset += sector_size as usize * 7;
         // Wait to be able to send another frame
         can_wait_ack(can).await;
     }
@@ -251,8 +283,9 @@ async fn can_send_whole_frame(
     app: &Vec<u8>,
     offset: u32,
     throttle: Option<u64>,
+    sector_size: u8,
 ) -> anyhow::Result<()> {
-    for i in (0..(FLASH_SECTOR_WRITE_SIZE)).step_by(7) {
+    for i in (0..(sector_size as usize * 7)).step_by(7) {
         let frame = FlashDataMessage {
             index: i as u8,
             data: bytemuck::pod_read_unaligned(
@@ -282,8 +315,6 @@ async fn can_wait_ack(can: &mut CanSocket) {
 }
 
 //// Frame kind types
-
-const FLASH_SECTOR_WRITE_SIZE: usize = 32 * 7;
 
 pub struct BeginCanFlashingMessage {
     board_id: u64,
@@ -367,10 +398,11 @@ impl FlashDataMessage {
     }
 }
 
-#[repr(C)]
+#[repr(C, packed)]
 #[derive(bytemuck::AnyBitPattern, bytemuck::NoUninit, Clone, Copy)]
 pub struct BeginFlashInfoMessage {
     app_len: u32,
+    sector_size: u8,
 }
 
 impl BeginFlashInfoMessage {
