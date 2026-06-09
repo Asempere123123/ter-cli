@@ -3,6 +3,7 @@ mod defmt;
 mod descriptor;
 mod flash;
 mod flash_size;
+mod projects;
 
 use std::{
     path::PathBuf,
@@ -93,6 +94,8 @@ enum Commands {
         /// Bootloader path. For testing purposes
         bootloader_path: Option<PathBuf>,
     },
+    /// Create new project
+    New,
     /// Clear all bootloader cache
     Clear,
 }
@@ -101,16 +104,6 @@ fn main() -> anyhow::Result<()> {
     env_logger::init_from_env(env_logger::Env::default().default_filter_or("info"));
 
     let cli = Cli::parse();
-    let descriptor = match Descriptor::from_path(cli.path) {
-        Ok(desc) => desc,
-        Err(e) => {
-            println!(
-                "Invalid or non existant ter.toml file. For correct configuration check the README.md https://github.com/Asempere123123/ter-cli/blob/main/README.md"
-            );
-            return Err(e);
-        }
-    };
-
     match cli.command {
         Commands::Run {
             bin_path,
@@ -121,6 +114,16 @@ fn main() -> anyhow::Result<()> {
             throttle,
             sector_size,
         } => {
+            let descriptor = match Descriptor::from_path(cli.path) {
+                Ok(desc) => desc,
+                Err(e) => {
+                    println!(
+                        "Invalid or non existant ter.toml file. For correct configuration check the README.md https://github.com/Asempere123123/ter-cli/blob/main/README.md"
+                    );
+                    return Err(e);
+                }
+            };
+
             if let Some(build_cmd) = descriptor.build_command() {
                 let status = Command::new("sh")
                     .arg("-c")
@@ -155,21 +158,43 @@ fn main() -> anyhow::Result<()> {
             can,
             throttle,
             sector_size,
-        } => flash_command(
-            bin_path,
-            defmt,
-            bootloader_defmt,
-            bootloader_path,
-            &descriptor,
-            can,
-            throttle,
-            sector_size,
-        )?,
+        } => {
+            let descriptor = match Descriptor::from_path(cli.path) {
+                Ok(desc) => desc,
+                Err(e) => {
+                    println!(
+                        "Invalid or non existant ter.toml file. For correct configuration check the README.md https://github.com/Asempere123123/ter-cli/blob/main/README.md"
+                    );
+                    return Err(e);
+                }
+            };
+
+            flash_command(
+                bin_path,
+                defmt,
+                bootloader_defmt,
+                bootloader_path,
+                &descriptor,
+                can,
+                throttle,
+                sector_size,
+            )?
+        }
         Commands::Attach {
             defmt,
             bootloader_defmt,
             bootloader_path,
         } => {
+            let descriptor = match Descriptor::from_path(cli.path) {
+                Ok(desc) => desc,
+                Err(e) => {
+                    println!(
+                        "Invalid or non existant ter.toml file. For correct configuration check the README.md https://github.com/Asempere123123/ter-cli/blob/main/README.md"
+                    );
+                    return Err(e);
+                }
+            };
+
             let (_bootloader_bin_path, bootloader_elf_path) =
                 get_bootloader_path(bootloader_path, &descriptor, bootloader_defmt)?;
 
@@ -182,6 +207,7 @@ fn main() -> anyhow::Result<()> {
                 &descriptor,
             )?;
         }
+        Commands::New => projects::create_new()?,
         Commands::Clear => {
             log::info!("Cleaning up bootloader cache");
             std::fs::remove_dir_all(DIRS.data_dir())?
