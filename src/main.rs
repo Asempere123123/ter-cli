@@ -4,6 +4,7 @@ mod descriptor;
 mod flash;
 mod flash_size;
 mod projects;
+mod self_update;
 
 use std::{
     path::PathBuf,
@@ -98,6 +99,8 @@ enum Commands {
     New,
     /// Clear all bootloader cache
     Clear,
+    /// Self-Update to latest version
+    Update,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -212,6 +215,7 @@ fn main() -> anyhow::Result<()> {
             log::info!("Cleaning up bootloader cache");
             std::fs::remove_dir_all(DIRS.data_dir())?
         }
+        Commands::Update => self_update::update_self()?,
     }
 
     Ok(())
