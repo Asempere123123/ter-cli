@@ -24,6 +24,12 @@ pub struct Descriptor {
     can2_tx: Option<String>,
     can2_rx: Option<String>,
     can_baudrate: Option<String>,
+    fdcan: Option<String>,
+    fdcan_rx: Option<String>,
+    fdcan_tx: Option<String>,
+    fdcan_int0_name: Option<String>,
+    fdcan_int1_name: Option<String>,
+    smps_power: Option<bool>,
     string_rtt: Option<bool>,
     flash_size: Option<u64>,
 }
@@ -32,38 +38,75 @@ impl Descriptor {
     pub fn from_path(path: impl AsRef<Path>) -> anyhow::Result<Self> {
         let desc: Descriptor = toml::from_str(&std::fs::read_to_string(path)?)?;
 
-        if !((desc.can.is_some()
-            && desc.can_tx.is_some()
-            && desc.can_rx.is_some()
-            && desc.can_baudrate.is_some())
-            || (desc.can.is_none()
-                && desc.can_tx.is_none()
-                && desc.can_rx.is_none()
-                && desc.can_baudrate.is_none()))
-        {
+        let has_can = match (
+            desc.can.is_some(),
+            desc.can_tx.is_some(),
+            desc.can_rx.is_some(),
+        ) {
+            (true, true, true) => true,
+            (false, false, false) => false,
+            _ => anyhow::bail!(
+                r#"Either all of "can", "can_tx", "can_rx" must be defined or none in ter.toml"#
+            ),
+        };
+
+        let has_can2 = match (
+            desc.can2.is_some(),
+            desc.can2_tx.is_some(),
+            desc.can2_rx.is_some(),
+        ) {
+            (true, true, true) => true,
+            (false, false, false) => false,
+            _ => anyhow::bail!(
+                r#"Either all of "can2", "can2_tx", "can2_rx" must be defined or none in ter.toml"#
+            ),
+        };
+
+        let has_fdcan = match (
+            desc.fdcan.is_some(),
+            desc.fdcan_tx.is_some(),
+            desc.fdcan_rx.is_some(),
+        ) {
+            (true, true, true) => true,
+            (false, false, false) => false,
+            _ => anyhow::bail!(
+                r#"Either all of "fdcan", "fdcan_tx", "fdcan_rx" must be defined or none in ter.toml"#
+            ),
+        };
+
+        if has_can2 && !has_can {
             anyhow::bail!(
-                r#"Either all "can", "can_tx", "can_rx", "can_baudrate" must be defined or none in ter.toml"#
+                "CAN2 is defined, but the primary 'can' interface is not. CAN2 requires CAN to be enabled."
             );
         }
 
-        if !((desc.can2.is_some()
-            && desc.can2_tx.is_some()
-            && desc.can2_rx.is_some()
-            && desc.can_baudrate.is_some())
-            || (desc.can2.is_none() && desc.can2_tx.is_none() && desc.can2_rx.is_none()))
-        {
-            anyhow::bail!(
-                r#"Either all "can2", "can2_tx", "can2_rx", "can_baudrate" must be defined or none in ter.toml"#
-            );
+        let needs_baudrate = has_can || has_can2 || has_fdcan;
+
+        match (needs_baudrate, desc.can_baudrate.is_some()) {
+            (true, false) => {
+                anyhow::bail!("can_baudrate must be defined when a CAN/FDCAN interface is enabled")
+            }
+            (false, true) => {
+                anyhow::bail!("can_baudrate is defined, but no CAN/FDCAN interfaces are enabled")
+            }
+            _ => {}
         }
 
-        if (desc.can_tx_int_name.is_some()
+        let has_can_ints = desc.can_tx_int_name.is_some()
             || desc.can_rx0_int_name.is_some()
             || desc.can_rx1_int_name.is_some()
-            || desc.can_sce_int_name.is_some())
-            && desc.can.is_none()
-        {
-            anyhow::bail!(r#"If any can_*_int_name is set can must be set"#);
+            || desc.can_sce_int_name.is_some();
+
+        if has_can_ints && !has_can {
+            anyhow::bail!(
+                "Classic CAN interrupts are defined, but the 'can' interface is not enabled"
+            );
+        }
+
+        let has_fdcan_ints = desc.fdcan_int0_name.is_some() || desc.fdcan_int1_name.is_some();
+
+        if has_fdcan_ints && !has_fdcan {
+            anyhow::bail!("FDCAN interrupts are defined, but the 'fdcan' interface is not enabled");
         }
 
         Ok(desc)
@@ -195,6 +238,43 @@ impl Descriptor {
                 "can-baudrate={}",
                 self.can_baudrate.clone().unwrap_or(String::from("NONE"))
             ),
+            slash_d.clone(),
+            format!(
+                "fdcan={}",
+                self.fdcan.clone().unwrap_or(String::from("NONE"))
+            ),
+            slash_d.clone(),
+            format!(
+                "fdcan-rx={}",
+                self.fdcan_rx.clone().unwrap_or(String::from("NONE"))
+            ),
+            slash_d.clone(),
+            format!(
+                "fdcan-tx={}",
+                self.fdcan_tx.clone().unwrap_or(String::from("NONE"))
+            ),
+            slash_d.clone(),
+            format!(
+                "fdcan-it0-int-name={}",
+                self.fdcan_int0_name
+                    .clone()
+                    .or(self
+                        .fdcan
+                        .as_ref()
+                        .map(|can| format!("{}_IT0", can.as_str())))
+                    .unwrap_or(String::from("NONE"))
+            ),
+            slash_d.clone(),
+            format!(
+                "fdcan-it1-int-name={}",
+                self.fdcan_int1_name
+                    .clone()
+                    .or(self
+                        .fdcan
+                        .as_ref()
+                        .map(|can| format!("{}_IT1", can.as_str())))
+                    .unwrap_or(String::from("NONE"))
+            ),
         ]
         .into_iter()
     }
@@ -210,6 +290,14 @@ impl Descriptor {
         }
         if self.can2.is_some() {
             args.push("can2");
+        }
+        if self.fdcan.is_some() {
+            args.push("fdcan");
+        }
+        if let Some(smps_power) = self.smps_power
+            && smps_power
+        {
+            args.push("smps_power");
         }
 
         args.into_iter()
@@ -240,6 +328,12 @@ pub struct DescriptorJson<'a> {
     can2_tx: &'a Option<String>,
     can2_rx: &'a Option<String>,
     can_baudrate: &'a Option<String>,
+    fdcan: &'a Option<String>,
+    fdcan_rx: &'a Option<String>,
+    fdcan_tx: &'a Option<String>,
+    fdcan_int0_name: &'a Option<String>,
+    fdcan_int1_name: &'a Option<String>,
+    smps_power: &'a Option<bool>,
     flash_size: &'a Option<u64>,
 }
 
@@ -259,6 +353,12 @@ impl<'a> From<&'a Descriptor> for DescriptorJson<'a> {
             can2_tx: &d.can2_tx,
             can2_rx: &d.can2_rx,
             can_baudrate: &d.can_baudrate,
+            fdcan: &d.fdcan,
+            fdcan_rx: &d.fdcan_rx,
+            fdcan_tx: &d.fdcan_tx,
+            fdcan_int0_name: &d.fdcan_int0_name,
+            fdcan_int1_name: &d.fdcan_int1_name,
+            smps_power: &d.smps_power,
             flash_size: &d.flash_size,
         }
     }
