@@ -9,16 +9,23 @@ pub fn attach_defmt(mut session: Session, elf_path: PathBuf) -> anyhow::Result<(
     log::info!("Attaching defmt logging");
     let mut core = session.core(0)?;
 
-    let mut rtt = Rtt::attach(&mut core)?;
+    let elf_bytes = std::fs::read(elf_path)?;
+    let table =
+        defmt_decoder::Table::parse(&elf_bytes)?.ok_or(anyhow!("Defmt table not found in ELF"))?;
+    let locations = table.get_locations(&elf_bytes)?;
+    let mut decoder = table.new_stream_decoder();
+
+    let mut rtt = locations
+        .iter()
+        .filter_map(|(location, _)| Rtt::attach_at(&mut core, *location).ok())
+        .next()
+        .or(Rtt::attach(&mut core).ok())
+        .ok_or(anyhow::anyhow!("Could not find RTT block"))?;
+
     let up_channel: &mut UpChannel = rtt
         .up_channels()
         .first_mut()
         .ok_or_else(|| anyhow!("No RTT up channel found"))?;
-
-    let elf_bytes = std::fs::read(elf_path)?;
-    let table =
-        defmt_decoder::Table::parse(&elf_bytes)?.ok_or(anyhow!("Defmt table not found in ELF"))?;
-    let mut decoder = table.new_stream_decoder();
 
     let mut buffer = [0u8; 1024 * 4];
     loop {
