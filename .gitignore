@@ -1,3 +1,4 @@
 **/ter.toml
 **/Cargo.lock
 **/target
+**/*.bin

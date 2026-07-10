@@ -32,6 +32,7 @@ pub struct Descriptor {
     smps_power: Option<bool>,
     string_rtt: Option<bool>,
     flash_size: Option<u64>,
+    external_macronix_octo_spi_flash: Option<bool>,
 }
 
 impl Descriptor {
@@ -110,6 +111,10 @@ impl Descriptor {
         }
 
         Ok(desc)
+    }
+
+    pub fn uses_external_flash(&self) -> bool {
+        self.external_macronix_octo_spi_flash.is_some_and(|v| v)
     }
 
     pub fn chip_name(&self) -> &str {
@@ -294,9 +299,10 @@ impl Descriptor {
         if self.fdcan.is_some() {
             args.push("fdcan");
         }
-        if let Some(smps_power) = self.smps_power
-            && smps_power
-        {
+        if self.external_macronix_octo_spi_flash.is_some_and(|v| v) {
+            args.push("external-macronix-octo-spi-flash");
+        }
+        if self.smps_power.is_some_and(|v| v) {
             args.push("smps_power");
         }
 
@@ -335,6 +341,7 @@ pub struct DescriptorJson<'a> {
     fdcan_int1_name: &'a Option<String>,
     smps_power: &'a Option<bool>,
     flash_size: &'a Option<u64>,
+    external_macronix_octo_spi_flash: &'a Option<bool>,
 }
 
 impl<'a> From<&'a Descriptor> for DescriptorJson<'a> {
@@ -360,6 +367,7 @@ impl<'a> From<&'a Descriptor> for DescriptorJson<'a> {
             fdcan_int1_name: &d.fdcan_int1_name,
             smps_power: &d.smps_power,
             flash_size: &d.flash_size,
+            external_macronix_octo_spi_flash: &d.external_macronix_octo_spi_flash,
         }
     }
 }

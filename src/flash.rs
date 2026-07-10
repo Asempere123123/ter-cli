@@ -10,13 +10,14 @@ use socketcan::{
 };
 use std::{path::Path, time::Duration, u8};
 
-use crate::{descriptor::Descriptor, flash_size};
+use crate::{descriptor::Descriptor, flash_external_flash::flash_external, flash_size};
 
 pub const FLASH_BASE_ADDR: u64 = 0x08000000;
 pub const DEFAULT_SECTOR_SIZE: u8 = 16;
 
 pub fn flash(
     bootloader_path: impl AsRef<Path>,
+    bootloader_elf_path: impl AsRef<Path>,
     app_path: impl AsRef<Path>,
     chip_name: &str,
     bootloader_defmt: bool,
@@ -31,7 +32,7 @@ pub fn flash(
     );
     log::info!("Flashing App");
     let bootloader = std::fs::read(bootloader_path)?;
-    let app = std::fs::read(app_path)?;
+    let app = std::fs::read(&app_path)?;
     if bootloader.len()
         > flash_size::get_first_sector_erase_and_write_size(&descriptor)?.erase_size as usize
     {
@@ -66,7 +67,7 @@ pub fn flash(
     let mut loader = session.target().flash_loader();
 
     loader.add_data(FLASH_BASE_ADDR, &bootloader)?;
-    if !bootloader_defmt {
+    if !bootloader_defmt && !descriptor.uses_external_flash() {
         loader.add_data(
             FLASH_BASE_ADDR
                 + flash_size::get_first_sector_erase_and_write_size(&descriptor)?.erase_size,
@@ -80,6 +81,9 @@ pub fn flash(
     core.reset()?;
     drop(core);
 
+    if descriptor.uses_external_flash() {
+        smol::block_on(flash_external(&mut session, bootloader_elf_path, app_path))?;
+    }
     Ok(session)
 }
 

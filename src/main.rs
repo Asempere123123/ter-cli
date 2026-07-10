@@ -2,6 +2,7 @@ mod bootloader;
 mod defmt;
 mod descriptor;
 mod flash;
+mod flash_external_flash;
 mod flash_size;
 mod projects;
 mod self_update;
@@ -238,6 +239,7 @@ fn flash_command(
     if let Some(bin_path) = bin_path {
         session = flash::flash(
             bootloader_bin_path,
+            &bootloader_elf_path,
             bin_path,
             descriptor.chip_name(),
             bootloader_defmt,
@@ -249,6 +251,7 @@ fn flash_command(
     } else if let Some(bin_path) = descriptor.bin_path() {
         session = flash::flash(
             bootloader_bin_path,
+            &bootloader_elf_path,
             bin_path,
             descriptor.chip_name(),
             bootloader_defmt,

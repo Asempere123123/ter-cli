@@ -15,6 +15,7 @@ env_logger = "0.11.9"
 log = "0.4.29"
 md5 = "0.8.0"
 nix = { version = "0.31.2", features = ["net"] }
+object = "0.39.1"
 probe-rs = "0.31.0"
 reqwest = { version = "0.13.2", features = ["blocking"] }
 self_update = "0.44.0"
