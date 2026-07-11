@@ -44,9 +44,14 @@ pub fn flash(
 
     if can {
         // TODO: assert that it is under 32 as that is the hardcoded max in the bootloader code
-        if sector_size.unwrap_or(DEFAULT_SECTOR_SIZE)
-            % flash_size::get_first_sector_erase_and_write_size(&descriptor)?.write_size
-            != 0
+        if (!descriptor.uses_external_flash()
+            && sector_size.unwrap_or(DEFAULT_SECTOR_SIZE)
+                % flash_size::get_first_sector_erase_and_write_size(&descriptor)?.write_size
+                != 0)
+            || (descriptor.uses_external_flash()
+                && sector_size.unwrap_or(DEFAULT_SECTOR_SIZE)
+                    % 2 // In OSPI we can only write in 2's
+                    != 0)
         {
             anyhow::bail!(
                 "Currently selected sector size is not a multiple of the write size, which is {}",
