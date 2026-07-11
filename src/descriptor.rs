@@ -32,7 +32,25 @@ pub struct Descriptor {
     smps_power: Option<bool>,
     string_rtt: Option<bool>,
     flash_size: Option<u64>,
+
     external_macronix_octo_spi_flash: Option<bool>,
+    external_flash_erase_size: Option<String>,
+    external_flash_write_size: Option<String>,
+
+    octo_spi_dummy_cycles: Option<String>,
+    octo_spi_device_size: Option<String>,
+    octo_spi_peri: Option<String>,
+    octo_spi_sck: Option<String>,
+    octo_spi_d0: Option<String>,
+    octo_spi_d1: Option<String>,
+    octo_spi_d2: Option<String>,
+    octo_spi_d3: Option<String>,
+    octo_spi_d4: Option<String>,
+    octo_spi_d5: Option<String>,
+    octo_spi_d6: Option<String>,
+    octo_spi_d7: Option<String>,
+    octo_spi_cs: Option<String>,
+    octo_spi_dqs: Option<String>,
 }
 
 impl Descriptor {
@@ -108,6 +126,27 @@ impl Descriptor {
 
         if has_fdcan_ints && !has_fdcan {
             anyhow::bail!("FDCAN interrupts are defined, but the 'fdcan' interface is not enabled");
+        }
+
+        if desc.external_macronix_octo_spi_flash.is_some_and(|v| v)
+            && (desc.external_flash_erase_size.is_none()
+                || desc.external_flash_write_size.is_none()
+                || desc.octo_spi_dummy_cycles.is_none()
+                || desc.octo_spi_device_size.is_none()
+                || desc.octo_spi_peri.is_none()
+                || desc.octo_spi_sck.is_none()
+                || desc.octo_spi_d0.is_none()
+                || desc.octo_spi_d1.is_none()
+                || desc.octo_spi_d2.is_none()
+                || desc.octo_spi_d3.is_none()
+                || desc.octo_spi_d4.is_none()
+                || desc.octo_spi_d5.is_none()
+                || desc.octo_spi_d6.is_none()
+                || desc.octo_spi_d7.is_none()
+                || desc.octo_spi_cs.is_none()
+                || desc.octo_spi_dqs.is_none())
+        {
+            anyhow::bail!("Missing configurations for macronix ospi flash");
         }
 
         Ok(desc)
@@ -289,6 +328,94 @@ impl Descriptor {
                     "NONE"
                 }
             ),
+            slash_d.clone(),
+            format!(
+                "external-flash-erase-size={}",
+                self.external_flash_erase_size
+                    .clone()
+                    .unwrap_or(String::from("NONE"))
+            ),
+            slash_d.clone(),
+            format!(
+                "external-flash-write-size={}",
+                self.external_flash_write_size
+                    .clone()
+                    .unwrap_or(String::from("NONE"))
+            ),
+            slash_d.clone(),
+            format!(
+                "octo-spi-dummy-cycles={}",
+                self.octo_spi_dummy_cycles
+                    .clone()
+                    .unwrap_or(String::from("NONE"))
+            ),
+            slash_d.clone(),
+            format!(
+                "octo-spi-device-size={}",
+                self.octo_spi_device_size
+                    .clone()
+                    .unwrap_or(String::from("NONE"))
+            ),
+            slash_d.clone(),
+            format!(
+                "octo-spi-peri={}",
+                self.octo_spi_peri.clone().unwrap_or(String::from("NONE"))
+            ),
+            slash_d.clone(),
+            format!(
+                "octo-spi-sck={}",
+                self.octo_spi_sck.clone().unwrap_or(String::from("NONE"))
+            ),
+            slash_d.clone(),
+            format!(
+                "octo-spi-d0={}",
+                self.octo_spi_d0.clone().unwrap_or(String::from("NONE"))
+            ),
+            slash_d.clone(),
+            format!(
+                "octo-spi-d1={}",
+                self.octo_spi_d1.clone().unwrap_or(String::from("NONE"))
+            ),
+            slash_d.clone(),
+            format!(
+                "octo-spi-d2={}",
+                self.octo_spi_d2.clone().unwrap_or(String::from("NONE"))
+            ),
+            slash_d.clone(),
+            format!(
+                "octo-spi-d3={}",
+                self.octo_spi_d3.clone().unwrap_or(String::from("NONE"))
+            ),
+            slash_d.clone(),
+            format!(
+                "octo-spi-d4={}",
+                self.octo_spi_d4.clone().unwrap_or(String::from("NONE"))
+            ),
+            slash_d.clone(),
+            format!(
+                "octo-spi-d5={}",
+                self.octo_spi_d5.clone().unwrap_or(String::from("NONE"))
+            ),
+            slash_d.clone(),
+            format!(
+                "octo-spi-d6={}",
+                self.octo_spi_d6.clone().unwrap_or(String::from("NONE"))
+            ),
+            slash_d.clone(),
+            format!(
+                "octo-spi-d7={}",
+                self.octo_spi_d7.clone().unwrap_or(String::from("NONE"))
+            ),
+            slash_d.clone(),
+            format!(
+                "octo-spi-cs={}",
+                self.octo_spi_cs.clone().unwrap_or(String::from("NONE"))
+            ),
+            slash_d.clone(),
+            format!(
+                "octo-spi-dqs={}",
+                self.octo_spi_dqs.clone().unwrap_or(String::from("NONE"))
+            ),
         ]
         .into_iter()
     }
@@ -350,7 +477,25 @@ pub struct DescriptorJson<'a> {
     fdcan_int1_name: &'a Option<String>,
     smps_power: &'a Option<bool>,
     flash_size: &'a Option<u64>,
+
     external_macronix_octo_spi_flash: &'a Option<bool>,
+    external_flash_erase_size: &'a Option<String>,
+    external_flash_write_size: &'a Option<String>,
+
+    octo_spi_dummy_cycles: &'a Option<String>,
+    octo_spi_device_size: &'a Option<String>,
+    octo_spi_peri: &'a Option<String>,
+    octo_spi_sck: &'a Option<String>,
+    octo_spi_d0: &'a Option<String>,
+    octo_spi_d1: &'a Option<String>,
+    octo_spi_d2: &'a Option<String>,
+    octo_spi_d3: &'a Option<String>,
+    octo_spi_d4: &'a Option<String>,
+    octo_spi_d5: &'a Option<String>,
+    octo_spi_d6: &'a Option<String>,
+    octo_spi_d7: &'a Option<String>,
+    octo_spi_cs: &'a Option<String>,
+    octo_spi_dqs: &'a Option<String>,
 }
 
 impl<'a> From<&'a Descriptor> for DescriptorJson<'a> {
@@ -376,7 +521,25 @@ impl<'a> From<&'a Descriptor> for DescriptorJson<'a> {
             fdcan_int1_name: &d.fdcan_int1_name,
             smps_power: &d.smps_power,
             flash_size: &d.flash_size,
+
             external_macronix_octo_spi_flash: &d.external_macronix_octo_spi_flash,
+            external_flash_erase_size: &d.external_flash_erase_size,
+            external_flash_write_size: &d.external_flash_write_size,
+
+            octo_spi_dummy_cycles: &d.octo_spi_dummy_cycles,
+            octo_spi_device_size: &d.octo_spi_device_size,
+            octo_spi_peri: &d.octo_spi_peri,
+            octo_spi_sck: &d.octo_spi_sck,
+            octo_spi_d0: &d.octo_spi_d0,
+            octo_spi_d1: &d.octo_spi_d1,
+            octo_spi_d2: &d.octo_spi_d2,
+            octo_spi_d3: &d.octo_spi_d3,
+            octo_spi_d4: &d.octo_spi_d4,
+            octo_spi_d5: &d.octo_spi_d5,
+            octo_spi_d6: &d.octo_spi_d6,
+            octo_spi_d7: &d.octo_spi_d7,
+            octo_spi_cs: &d.octo_spi_cs,
+            octo_spi_dqs: &d.octo_spi_dqs,
         }
     }
 }
