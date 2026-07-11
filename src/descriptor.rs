@@ -280,6 +280,15 @@ impl Descriptor {
                         .map(|can| format!("{}_IT1", can.as_str())))
                     .unwrap_or(String::from("NONE"))
             ),
+            slash_d.clone(),
+            format!(
+                "external-flash-addr={}",
+                if self.uses_external_flash() {
+                    "0x90000000"
+                } else {
+                    "NONE"
+                }
+            ),
         ]
         .into_iter()
     }

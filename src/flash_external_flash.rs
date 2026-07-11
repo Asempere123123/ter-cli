@@ -128,7 +128,7 @@ async fn write_buf(
     Ok(())
 }
 
-fn find_rtt_control_block(bootloader_elf_path: impl AsRef<Path>) -> anyhow::Result<u64> {
+pub fn find_rtt_control_block(bootloader_elf_path: impl AsRef<Path>) -> anyhow::Result<u64> {
     let bin_data = fs::read(bootloader_elf_path)?;
     let file = object::File::parse(&*bin_data)?;
 
