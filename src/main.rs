@@ -285,12 +285,7 @@ fn attach_command(
     defmt: Option<PathBuf>,
     descriptor: &Descriptor,
 ) -> anyhow::Result<()> {
-    if descriptor.uses_external_flash() {
-        std::thread::sleep(std::time::Duration::from_millis(50));
-    }
-    if descriptor.can_baudrate().is_some() {
-        std::thread::sleep(std::time::Duration::from_millis(500));
-    }
+    std::thread::sleep(std::time::Duration::from_millis(550));
 
     if bootloader_defmt {
         defmt::attach_defmt(session, bootloader_elf_path)?;
