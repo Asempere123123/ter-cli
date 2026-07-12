@@ -3,6 +3,8 @@ use cached::proc_macro::cached;
 use serde_json::Value;
 
 const DEFAULT_BOOTLOADER_SIZE: u64 = 16;
+const DEFAULT_RAM_BEGIN: u64 = 0x20000000;
+const DEFAULT_AXISRAM_BEGIN: u64 = 0x24000000;
 
 static APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/v", env!("CARGO_PKG_VERSION"),);
 
@@ -128,15 +130,38 @@ pub fn get_chip_sizes(chip_name: &str) -> anyhow::Result<ChipSizes> {
         .filter_map(|flash| flash["size"].as_u64())
         .sum();
 
-    let ram_size = json["memory"]
+    let mut ram_begin = DEFAULT_RAM_BEGIN;
+    let mut ram_size = json["memory"]
         .as_array()
         .into_iter()
         .flatten()
         .filter_map(|memory| memory.as_array())
         .flatten()
-        .filter(|memory| memory["kind"].as_str() == Some("ram")) // Desconozco si existe algun tipo de ram exotico que no nos interese, para cosas normales creo q nos da igual
+        .filter(|memory| {
+            memory["kind"].as_str() == Some("ram")
+                && memory["address"].as_u64() == Some(DEFAULT_RAM_BEGIN)
+        })
         .filter_map(|flash| flash["size"].as_u64())
         .sum();
+
+    // Check for axisram
+    let axisram_size = json["memory"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|memory| memory.as_array())
+        .flatten()
+        .filter(|memory| {
+            memory["kind"].as_str() == Some("ram")
+                && memory["address"].as_u64() == Some(DEFAULT_AXISRAM_BEGIN)
+        })
+        .filter_map(|flash| flash["size"].as_u64())
+        .sum();
+
+    if axisram_size > ram_size {
+        ram_size = axisram_size;
+        ram_begin = DEFAULT_AXISRAM_BEGIN;
+    }
 
     let peripherals = json["cores"]
         .as_array()
@@ -150,6 +175,7 @@ pub fn get_chip_sizes(chip_name: &str) -> anyhow::Result<ChipSizes> {
     Ok(ChipSizes {
         erase_size: first_flash_erase_size,
         flash_size,
+        ram_begin,
         ram_size,
         peripherals,
     })
@@ -158,6 +184,7 @@ pub fn get_chip_sizes(chip_name: &str) -> anyhow::Result<ChipSizes> {
 pub struct ChipSizes {
     pub erase_size: u64,
     pub flash_size: u64,
+    pub ram_begin: u64,
     pub ram_size: u64,
     pub peripherals: Vec<Value>,
 }

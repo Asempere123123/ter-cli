@@ -267,6 +267,7 @@ fn flash_command(
         return Ok(());
     }
 
+    std::thread::sleep(std::time::Duration::from_millis(2000));
     attach_command(
         bootloader_defmt,
         session,
@@ -285,8 +286,6 @@ fn attach_command(
     defmt: Option<PathBuf>,
     descriptor: &Descriptor,
 ) -> anyhow::Result<()> {
-    std::thread::sleep(std::time::Duration::from_millis(550));
-
     if bootloader_defmt {
         defmt::attach_defmt(session, bootloader_elf_path)?;
     } else if let Some(elf_path) = defmt {
